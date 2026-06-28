@@ -17,7 +17,7 @@ from app.core.log import logger
 
 
 class PlaywrightBrowser:
-    def __init__(self, max_contexts: int = 3):
+    def __init__(self, max_contexts: int = 1):
         """多 context 浏览器池（2026-06-26 batch 化重构）。
 
         Args:

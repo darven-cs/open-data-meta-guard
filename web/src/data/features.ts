@@ -32,7 +32,7 @@ export const FEATURES: Feature[] = [
     // 三个方块堆叠，表「分层元数据」
     iconPath:
       'M3 6h7v4H3zM14 6h7v4h-7zM3 14h7v4H3zM14 14h7v4h-7z',
-    ready: false,  // Phase 1 点亮
+    ready: true,  // Phase 1 完成
   },
   {
     id: 'meta-evaluate',

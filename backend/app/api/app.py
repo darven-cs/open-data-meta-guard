@@ -3,7 +3,8 @@ FastAPI 应用工厂。
 
 v2.0 调整：
   - **Phase 0 只注册 health router**
-  - Phase 1-5 依次加入 meta_collect / meta_evaluate / data_collect /
+  - **Phase 1 注册 meta_collect router**（datasets 采集）
+  - Phase 2-5 依次加入 meta_evaluate / data_collect /
     data_quality / chat router
   - 移除 v1.0 的 agent / meta_collect router
 """
@@ -19,6 +20,7 @@ from app.core.log import setup_logging, logger
 from app.core.lifespan import app_lifespan
 
 from app.api.routes import health
+from app.api.routes import meta_collect  # Phase 1
 
 
 def create_app():
@@ -36,6 +38,8 @@ def create_app():
             content={"error": "internal_error"},
         )
 
-    # Phase 0 仅注册 health；后续 Phase 追加 router
+    # Phase 0: health
     app.include_router(health.router)
+    # Phase 1: meta_collect
+    app.include_router(meta_collect.router)
     return app
