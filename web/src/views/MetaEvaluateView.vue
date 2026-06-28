@@ -1,11 +1,278 @@
 <!--
-  MetaEvaluateView: 元数据评估（Phase 0 占位）
-  - Phase 2 替换为真实页面：基于 EU MQA 规则的评估列表 + 报告
+  MetaEvaluateView: 元数据评估（Phase 2 完整实现 · 行级评估按钮版）
+
+  直接展示 datasets 列表，每行右边一个 state-aware 按钮：
+    - status='pending'                              → 「采集中…」禁用
+    - status=其他 + latest_evaluation == null       → 「触发评估」（点击行内触发）
+    - status=其他 + latest_evaluation != null       → 「查看评估」（点击打开 Drawer）
+  触发中：按钮变为「评估中…」禁用；触发成功后自动刷新并打开 Drawer。
 -->
 <template>
-  <PlaceholderView feature-id="meta-evaluate" :phase-number="2" />
+  <div class="meta-evaluate-view">
+    <!-- 头部 -->
+    <header class="meta-evaluate-view__head">
+      <p class="meta-evaluate-view__eyebrow">
+        <span class="meta-evaluate-view__eyebrow-tag">Phase 2</span>
+        <span class="meta-evaluate-view__eyebrow-sep">/</span>
+        <span class="meta-evaluate-view__eyebrow-mute">Metadata Evaluation</span>
+      </p>
+      <h1 class="meta-evaluate-view__title">元数据评估</h1>
+      <p class="meta-evaluate-view__lead">
+        基于欧盟 MQA 405 分制 + 23 条 indicator。点击行右侧按钮触发评估或查看已有报告。
+      </p>
+    </header>
+
+    <hr class="meta-evaluate-view__rule" />
+
+    <!-- 工具栏 -->
+    <div class="meta-evaluate-view__toolbar">
+      <button
+        type="button"
+        class="meta-evaluate-view__btn"
+        :disabled="loading"
+        @click="refresh"
+      >
+        {{ loading ? '刷新中…' : '刷新' }}
+      </button>
+    </div>
+
+    <!-- 错误条 -->
+    <p v-if="errorMsg" class="meta-evaluate-view__error">
+      ⚠ {{ errorMsg }}
+      <button class="meta-evaluate-view__error-close" @click="errorMsg = ''">×</button>
+    </p>
+
+    <!-- 列表 -->
+    <EvaluationList
+      :items="items"
+      :page="page"
+      :size="size"
+      :count="items.length"
+      :total="totalHint"
+      :loading="loading"
+      :evaluating-ids="evaluatingIds"
+      @page-change="onPageChange"
+      @view="openDetailByItem"
+      @trigger="triggerForItem"
+    />
+
+    <!-- 详情 Drawer -->
+    <EvaluationDialog
+      :open="dialogOpen"
+      :evaluation="dialogEvaluation"
+      :loading="dialogLoading"
+      @close="closeDialog"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import PlaceholderView from './PlaceholderView.vue'
+import { onMounted, reactive, ref } from 'vue'
+import {
+  getEvaluation as apiGetEvaluation,
+  listDatasetsWithEvaluation as apiListDatasets,
+  triggerEvaluate as apiTrigger,
+  type DatasetEvalItem,
+  type EvaluationDetail,
+} from '@/api/meta-evaluate'
+import EvaluationList from '@/components/meta-evaluate/EvaluationList.vue'
+import EvaluationDialog from '@/components/meta-evaluate/EvaluationDialog.vue'
+
+// ───────── 列表状态 ─────────
+const items = ref<DatasetEvalItem[]>([])
+const page = ref(1)
+const size = ref(20)
+const totalHint = ref<number | undefined>(undefined)
+const loading = ref(false)
+const errorMsg = ref('')
+const evaluatingIds = reactive(new Set<string>())
+
+async function refresh() {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    const res = await apiListDatasets(page.value, size.value)
+    items.value = res.items
+    totalHint.value = res.count
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
+}
+
+function onPageChange(p: number) {
+  page.value = p
+  void refresh()
+}
+
+// ───────── 触发评估（行内） ─────────
+async function triggerForItem(item: DatasetEvalItem) {
+  if (evaluatingIds.has(item.id)) return
+  if (item.status === 'pending') return
+  evaluatingIds.add(item.id)
+  errorMsg.value = ''
+  try {
+    const res = await apiTrigger(item.id)
+    // 触发成功后刷新列表（让 latest_evaluation 出现），然后自动打开 Drawer
+    await refresh()
+    await openDetailById(res.evaluation_id)
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  } finally {
+    evaluatingIds.delete(item.id)
+  }
+}
+
+// ───────── 详情 Drawer ─────────
+const dialogOpen = ref(false)
+const dialogEvaluation = ref<EvaluationDetail | null>(null)
+const dialogLoading = ref(false)
+
+async function openDetailByItem(item: DatasetEvalItem) {
+  if (!item.latest_evaluation) return
+  await openDetailById(item.latest_evaluation.id)
+}
+
+async function openDetailById(id: number) {
+  dialogOpen.value = true
+  dialogEvaluation.value = null
+  dialogLoading.value = true
+  try {
+    dialogEvaluation.value = await apiGetEvaluation(id)
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+    dialogOpen.value = false
+  } finally {
+    dialogLoading.value = false
+  }
+}
+
+function closeDialog() {
+  dialogOpen.value = false
+  dialogEvaluation.value = null
+}
+
+// ───────── 初始加载 ─────────
+onMounted(() => {
+  void refresh()
+})
 </script>
+
+<style scoped>
+.meta-evaluate-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--sp-6);
+  box-sizing: border-box;
+  gap: var(--sp-4);
+}
+
+.meta-evaluate-view__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.meta-evaluate-view__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-mute);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.meta-evaluate-view__eyebrow-tag {
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm);
+}
+.meta-evaluate-view__eyebrow-sep { color: var(--hairline-strong); }
+.meta-evaluate-view__eyebrow-mute { color: var(--ink-mute); }
+
+.meta-evaluate-view__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.meta-evaluate-view__lead {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--ink-sub);
+  margin: 0;
+  line-height: 1.55;
+}
+
+.meta-evaluate-view__rule {
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.meta-evaluate-view__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.meta-evaluate-view__btn {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.meta-evaluate-view__btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.meta-evaluate-view__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.meta-evaluate-view__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.meta-evaluate-view__error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  background: var(--accent-bg);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  margin: 0;
+}
+
+.meta-evaluate-view__error-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: var(--text-md);
+  cursor: pointer;
+  padding: 0 var(--sp-2);
+}
+</style>

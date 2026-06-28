@@ -18,9 +18,6 @@
         <span class="meta-collect-view__eyebrow-mute">Metadata Ingestion</span>
       </p>
       <h1 class="meta-collect-view__title">元数据采集</h1>
-      <p class="meta-collect-view__lead">
-        输入数据源 URL，Playwright 抓取详情页的元数据键值对，落 PostgreSQL datasets 表。
-      </p>
     </header>
 
     <hr class="meta-collect-view__rule" />

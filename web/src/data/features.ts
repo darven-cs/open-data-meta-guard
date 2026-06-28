@@ -43,7 +43,7 @@ export const FEATURES: Feature[] = [
     // 文档 + 对勾，表「质量评估」
     iconPath:
       'M6 3h9l4 4v14H6zM15 3v4h4M9 13l2 2 4-4',
-    ready: false,  // Phase 2 点亮
+    ready: true,   // Phase 2 点亮
   },
   {
     id: 'data-collect',
