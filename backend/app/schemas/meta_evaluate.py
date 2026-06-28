@@ -107,3 +107,52 @@ class DatasetEvalListResponse(BaseModel):
     page: int
     size: int
     count: int
+
+
+# ──────────────────────── 异步 job ────────────────────────
+
+
+class EvaluateJobResponse(BaseModel):
+    """job 状态响应：POST /evaluations / GET /evaluations/jobs/{job_id} 通用。"""
+
+    job_id: int = Field(description="job id")
+    dataset_id: str = Field(description="被评估的 dataset id")
+    status: str = Field(
+        description="pending / running / completed / failed / cancelled",
+    )
+    evaluation_id: Optional[int] = Field(
+        default=None,
+        description="成功后写入的 meta_evaluations.id",
+    )
+    error: Optional[str] = Field(default=None, description="失败/取消原因")
+    elapsed_ms: Optional[int] = Field(default=None, description="总耗时（ms）")
+    token_prompt: Optional[int] = Field(default=None, description="LLM prompt tokens")
+    token_completion: Optional[int] = Field(default=None, description="LLM completion tokens")
+    token_total: Optional[int] = Field(default=None, description="token 总数")
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+
+
+class JobListItem(BaseModel):
+    """GET /evaluations/jobs 列表单条。"""
+
+    job_id: int
+    dataset_id: str
+    status: str
+    evaluation_id: Optional[int] = None
+    error: Optional[str] = None
+    elapsed_ms: Optional[int] = None
+    token_total: Optional[int] = None
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+
+
+class JobListResponse(BaseModel):
+    """GET /evaluations/jobs 列表响应。"""
+
+    items: list[JobListItem]
+    page: int
+    size: int
+    count: int

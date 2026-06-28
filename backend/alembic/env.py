@@ -31,6 +31,11 @@ load_dotenv()  # noqa: E402
 from app.core.db import Base  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
+# 显式 import 所有 ORM 模型，确保 Base.metadata 包含完整表信息
+from app.model import dataset  # noqa: E402, F401
+from app.model import meta_evaluation  # noqa: E402, F401
+from app.model import meta_evaluation_job  # noqa: E402, F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

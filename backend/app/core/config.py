@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     quality_sample_size: int = Field(default=100_000)
     quality_minimal_mode: bool = Field(default=True)
 
+    # ---------- meta_evaluate 异步 worker ----------
+    # 单次 agent.ainvoke 硬超时（秒）
+    meta_evaluate_timeout_sec: int = Field(default=180)
+    # worker 主循环 tick 间隔（秒），claim 周期
+    meta_evaluate_worker_tick_sec: float = Field(default=1.0)
+    # 启动时重置 stale running job 的阈值（秒）
+    meta_evaluate_stale_threshold_sec: int = Field(default=300)
+    # reason_content / tool_calls 日志截断阈值（字节）
+    meta_evaluate_log_truncate_bytes: int = Field(default=16 * 1024)
+
     # ---------- 计算属性 ----------
     @computed_field  # type: ignore[prop-decorator]
     @property
