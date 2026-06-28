@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────
+# v2.0 中间件：仅 PostgreSQL（v1.0 的 Neo4j 已彻底移除）
+# ─────────────────────────────────────────────────────────────────────
+# 启动命令：
+#   docker compose up -d              # 起服务
+#   docker compose ps                 # 看状态 + 端口
+#   docker compose logs -f postgres   # 看日志
+#   docker compose down               # 停服务（保留数据卷）
+#   docker compose down -v            # 停服务 + 删数据卷（重置）
+# ─────────────────────────────────────────────────────────────────────
+#
+# 端口规划（v2.0 单独占用一组，避免与 v1.0 冲突）：
+#   10020 → PostgreSQL (容器内 5432)
+#
+# 凭据：
+#   PG: postgres / change_me  库: open_data_meta_guard
+#
+# 应用侧 .env 对应配置（请同步到 .env）：
+#   POSTGRES_HOST=localhost
+#   POSTGRES_PORT=10020
+#   POSTGRES_DB=open_data_meta_guard
+#   POSTGRES_USER=postgres
+#   POSTGRES_PASSWORD=change_me
+
+services:
+  # ───────── PostgreSQL 16 ─────────
+  # v2.0 表：datasets / meta_evaluations / data_downloads /
+  #        data_quality_evaluations / chat_sessions / chat_messages 共 6 张
+  postgres:
+    image: postgres:16-alpine
+    container_name: odmg-v2-postgres
+    restart: unless-stopped
+    ports:
+      - "10020:5432"
+    environment:
+      POSTGRES_DB: open_data_meta_guard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C.UTF-8"
+    volumes:
+      - postgres_v2_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d open_data_meta_guard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - odmg-v2-net
+
+# ─────────────────────────────────────────────────────────────────────
+# 命名卷：docker compose down 不会删除，要彻底清空用 `docker compose down -v`
+# ─────────────────────────────────────────────────────────────────────
+volumes:
+  postgres_v2_data:
+    name: odmg_v2_postgres_data
+
+networks:
+  odmg-v2-net:
+    name: odmg-v2-net
+    driver: bridge

@@ -1,0 +1,477 @@
+:root {
+  /* —— 表面 —— */
+  --paper:        #fafaf7;   /* 主背景 */
+  --paper-sub:    #f4f1e8;   /* 次级表面（侧栏底/代码块底） */
+  --ink:          #0a0a0a;   /* 正文/标题 */
+  --ink-sub:      #4a4a4a;   /* 次级文本 */
+  --ink-mute:     #8a8a8a;   /* 三级文本/占位符 */
+  --hairline:     #e5e2da;   /* 发丝线 */
+  --hairline-strong: #c9c4b5;/* 强发丝线（focus 边框） */
+
+  /* —— 强调（仅交互点） —— */
+  --accent:        #d4321c;  /* 朱红 */
+  --accent-bg:     rgba(212, 50, 28, 0.06);
+  --accent-border: rgba(212, 50, 28, 0.35);
+
+  /* —— 状态色（success / warning）—— */
+  --success:       #2d7a3e;
+  --success-bg:    rgba(45, 122, 62, 0.08);
+  --warning:       #b8821e;
+  --warning-bg:    rgba(184, 130, 30, 0.08);
+
+  /* —— 字体栈 —— */
+  --font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --font-sans:    'Inter Tight Variable', 'Inter Tight', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+
+  /* —— 字号阶梯 —— */
+  --text-xs:   12px;
+  --text-sm:   13.5px;
+  --text-base: 15px;
+  --text-md:   17px;
+  --text-lg:   22px;
+  --text-xl:   32px;
+
+  /* —— 间距 token —— */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  /* —— 兼容别名（旧 token 指向新 token，避免遗漏组件引用断裂） —— */
+  --bg:        var(--paper);
+  --border:    var(--hairline);
+  --text:      var(--ink-mute);
+  --text-h:    var(--ink);
+  --code-bg:   var(--paper-sub);
+  --sans:      var(--font-sans);
+  --heading:   var(--font-display);
+  --mono:      var(--font-mono);
+  --shadow:    none;
+  --social-bg: var(--paper-sub);
+
+  /* —— Admin Layout 尺寸 token —— */
+  --sidebar-width: 240px;
+  --topbar-height: 56px;
+
+  /* —— Sidebar 状态 token —— */
+  --nav-active-bg: var(--paper-sub);
+  --nav-active-text: var(--accent);
+  --nav-active-border: var(--accent);
+
+  /* —— Drawer 层级 token —— */
+  --sidebar-z: 20;
+  --backdrop-z: 19;
+
+  /* —— 全局排版 —— */
+  font: 15px/1.55 var(--font-sans);
+  letter-spacing: 0;
+  font-optical-sizing: auto;  /* 启用 Fraunces 光学尺寸轴 */
+  color-scheme: light dark;
+  color: var(--ink-mute);
+  background: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:        #161513;   /* 暖炭黑（不用纯黑避免冷冰） */
+    --paper-sub:    #1f1d1a;
+    --ink:          #f0ede4;   /* 暖纸白 */
+    --ink-sub:      #b8b3a6;
+    --ink-mute:     #7a766c;
+    --hairline:     #2a2823;
+    --hairline-strong: #4a463d;
+    --accent:        #e85a3e;  /* 朱红提亮一档，保证暗底对比 */
+    --accent-bg:     rgba(232, 90, 62, 0.10);
+    --accent-border: rgba(232, 90, 62, 0.45);
+    --success:       #5fb872;  /* 暗底提亮的草绿 */
+    --success-bg:    rgba(95, 184, 114, 0.12);
+    --warning:       #d9a847;  /* 暗底提亮的琥珀 */
+    --warning-bg:    rgba(217, 168, 71, 0.12);
+  }
+}
+
+/* —— 移动端：sidebar 不占 grid 列，drawer 用 fixed positioning —— */
+@media (max-width: 960px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+}
+
+/* —— Reset —— */
+body {
+  margin: 0;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: var(--text-xl);
+  letter-spacing: -0.02em;
+  margin: var(--sp-6) 0;
+}
+
+h2 {
+  font-size: var(--text-lg);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--sp-2);
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--paper-sub);
+  border-radius: var(--radius-sm);
+}
+
+/* —— 全局 focus 反馈（弥补现状缺口） —— */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* —— 滚动条样式 —— */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hairline-strong);
+}
+
+#app {
+  max-width: 100%;
+  margin: 0 auto;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* —— Markdown 渲染样式(Swiss Editorial 风格) —— */
+  .markdown {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.65;       /* 比 base.css 默认 1.55 略松,长文阅读舒适 */
+    color: var(--ink);
+  }
+
+  .markdown > *:first-child { margin-top: 0; }
+  .markdown > *:last-child { margin-bottom: 0; }
+
+  /* 标题:Fraunces 衬线,字重 400(不用 700,Swiss 风用粗细对比不用色块) */
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    margin: var(--sp-5) 0 var(--sp-3);
+  }
+  .markdown h1 { font-size: var(--text-xl); letter-spacing: -0.02em; }
+  .markdown h2 { font-size: var(--text-lg); }
+  .markdown h3 { font-size: var(--text-md); }
+  .markdown h4 { font-size: var(--text-base); }
+
+  /* 段落:不设首行缩进(西方排版传统) */
+  .markdown p {
+    margin: 0 0 var(--sp-3);
+  }
+
+  /* 行内 code:复用全局 code 样式,稍紧 */
+  .markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--paper-sub);
+    padding: 1px var(--sp-1);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Fenced code block:paper-sub 底 + 朱红左竖线(Swiss Editorial 强调点) */
+  .markdown pre {
+    margin: 0 0 var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
+    padding-top: var(--sp-5);              /* 留出顶栏空间(语言标签 + Copy 按钮) */
+    background: var(--paper-sub);
+    border-left: 2px solid var(--accent);  /* 朱红竖线,和 reasoning 一致 */
+    border-radius: 0;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    position: relative;                    /* 顶栏 bar 绝对定位的锚点 */
+  }
+  .markdown pre code {
+    background: transparent;     /* pre 内部不再加底 */
+    padding: 0;
+    font-size: inherit;
+    color: var(--ink);
+  }
+
+  /* 引用:朱红左竖线 + 斜体衬线(和 reasoning 风格统一) */
+  .markdown blockquote {
+    margin: 0 0 var(--sp-3);
+    padding: 0 var(--sp-4);
+    border-left: 2px solid var(--accent);
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--ink-sub);
+  }
+
+  /* 列表:紧凑,marker 朱红 */
+  .markdown ul,
+  .markdown ol {
+    margin: 0 0 var(--sp-3);
+    padding-left: var(--sp-5);
+  }
+  .markdown li { margin-bottom: var(--sp-1); }
+  .markdown li::marker { color: var(--accent); }
+
+  /* 链接:朱红 + 下划线 */
+  .markdown a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .markdown a:hover { text-decoration-thickness: 2px; }
+
+  /* 水平分割线:发丝线 */
+  .markdown hr {
+    border: none;
+    border-top: 1px solid var(--hairline);
+    margin: var(--sp-4) 0;
+  }
+
+  /* 表格:发丝线边框,header 加粗 */
+  .markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 var(--sp-4);
+    font-size: var(--text-sm);
+  }
+  .markdown th,
+  .markdown td {
+    border: 1px solid var(--hairline);
+    padding: var(--sp-1) var(--sp-2);
+    text-align: left;
+  }
+  .markdown th {
+    font-weight: 600;
+    background: var(--paper-sub);
+  }
+
+  /* —— highlight.js token 配色(三色制:油墨黑 / 朱红 / mute 灰) —— */
+  /* 关键字用粗体不用色,字符串/数字用朱红,注释弱化,符合 Swiss Editorial */
+  .markdown .hljs-keyword,
+  .markdown .hljs-selector-tag,
+  .markdown .hljs-built_in,
+  .markdown .hljs-name,
+  .markdown .hljs-tag {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .markdown .hljs-string,
+  .markdown .hljs-attr,
+  .markdown .hljs-template-tag,
+  .markdown .hljs-template-variable {
+    color: var(--accent);   /* 朱红 */
+  }
+  .markdown .hljs-comment,
+  .markdown .hljs-quote,
+  .markdown .hljs-meta {
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+  .markdown .hljs-number,
+  .markdown .hljs-literal {
+    color: var(--accent);
+  }
+  .markdown .hljs-title,
+  .markdown .hljs-section,
+  .markdown .hljs-function .hljs-title {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .markdown .hljs-variable,
+  .markdown .hljs-params {
+    color: var(--ink-sub);
+  }
+
+  /* —— <pre> 顶栏:语言标签 + Copy 按钮(绝对定位)—— */
+  .markdown .markdown-pre__bar {
+    position: absolute;
+    top: var(--sp-1);
+    right: var(--sp-2);
+    left: var(--sp-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    line-height: 1;
+    pointer-events: none;       /* bar 整体不接事件,只按钮接 */
+    z-index: 1;
+  }
+  .markdown .markdown-pre__lang {
+    color: var(--ink-mute);
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+    font-family: var(--font-mono);
+  }
+  .markdown .markdown-pre__copy {
+    pointer-events: auto;       /* 按钮单独恢复事件 */
+    background: transparent;
+    border: 1px solid var(--hairline);
+    color: var(--ink-mute);
+    padding: 2px var(--sp-2);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .markdown .markdown-pre__copy:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .markdown .markdown-pre__copy:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* —— 流式光标(朱红竖线 + 1.1s 闪烁,Swiss 风 step 硬切)—— */
+  .markdown__cursor {
+    display: inline-block;
+    width: 8px;
+    height: 1em;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: markdown-cursor-blink 1.1s steps(2, start) infinite;
+  }
+  @keyframes markdown-cursor-blink {
+    to { visibility: hidden; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .markdown__cursor { animation: none; }
+  }
+
+  /* —— 表格横向滚动 wrapper —— */
+  .markdown .markdown-table-wrap {
+    overflow-x: auto;
+    margin: 0 0 var(--sp-4);
+  }
+  .markdown .markdown-table-wrap > table {
+    margin-bottom: 0;
+  }
+
+  /* —— 嵌套列表 / blockquote p 收边 —— */
+  .markdown ul ul,
+  .markdown ol ol,
+  .markdown ul ol,
+  .markdown ol ul {
+    margin: var(--sp-1) 0 var(--sp-2);
+  }
+  .markdown blockquote p {
+    margin: 0 0 var(--sp-2);
+  }
+  .markdown blockquote p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* —— MessageList 底部渐变遮罩 —— */
+  /* 滚到底时最后一条消息渐隐到透明,避免被 ChatInput 视觉遮挡看不出还有内容 */
+  .chat-layout__message--fade {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      black 0,
+      black calc(100% - 48px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to bottom,
+      black 0,
+      black calc(100% - 48px),
+      transparent 100%
+    );
+    padding-bottom: 24px;
+  }
+
+  /* —— 智能粘底滚动支持 —— */
+  /* .chat-layout__message 是滚动容器（class 由 ChatLayout.vue fallthrough 到 MessageList 根 div）
+     此处补充三个属性，与 ChatLayout.vue scoped 样式合并生效（不动 ChatLayout.vue） */
+  .chat-layout__message {
+    /* 关闭浏览器默认滚动锚定，避免它跟我们的 scrollTo 写入打架（MDN 推荐做法） */
+    overflow-anchor: none;
+    /* FAB 绝对定位的参考系（MessageList scoped 样式里也加了，双保险） */
+    position: relative;
+    /* 显式禁用全局 smooth，防被 reset.css 之类污染（流式跟随必须用瞬时跳） */
+    scroll-behavior: auto;
+  }
+
+  /* —— FAB：未粘底时显示在右下角，点击平滑滚到底部（Swiss Editorial 三色制）—— */
+  /* position: sticky 而非 absolute：absolute 子元素会随滚动容器内容一起滚（实测 scrollTop=1254 时 FAB 视口 y=-778），
+     sticky 才能真正"粘"在滚动容器的可见视口内。bottom:56px 同时避开底部 48px mask 渐变。 */
+  .chat-scroll-fab {
+    position: sticky;
+    position: -webkit-sticky;
+    bottom: calc(var(--sp-7) + var(--sp-2));
+    z-index: 10;
+    /* block + margin-left:auto 把按钮推到父 block 右侧 */
+    display: block;
+    margin-left: auto;
+    margin-right: var(--sp-5);
+    /* FAB 是末尾子元素，向上拉 36px 防止给内容末尾增加额外高度 */
+    margin-top: -36px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--accent-border);
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    line-height: 36px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.12s;
+  }
+  .chat-scroll-fab:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--paper);
+    transform: translateY(-1px);
+  }
+  .chat-scroll-fab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chat-scroll-fab { transition: none; }
+    .chat-scroll-fab:hover { transform: none; }
+  }
