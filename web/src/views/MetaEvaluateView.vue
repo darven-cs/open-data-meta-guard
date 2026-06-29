@@ -61,6 +61,7 @@
     <EvaluationDialog
       :open="dialogOpen"
       :evaluation="dialogEvaluation"
+      :dataset="dialogDataset"
       :loading="dialogLoading"
       @close="closeDialog"
     />
@@ -134,6 +135,7 @@ async function doTrigger(item: DatasetEvalItem) {
   evaluatingIds.add(item.id)
   errorMsg.value = ''
   // 立即打开 Drawer 显示 loading，避免等后端完成期间出现空窗
+  dialogDataset.value = item
   dialogOpen.value = true
   dialogEvaluation.value = null
   dialogLoading.value = true
@@ -173,10 +175,12 @@ function sleep(ms: number): Promise<void> {
 // ───────── 详情 Drawer ─────────
 const dialogOpen = ref(false)
 const dialogEvaluation = ref<EvaluationDetail | null>(null)
+const dialogDataset = ref<DatasetEvalItem | null>(null)
 const dialogLoading = ref(false)
 
 async function openDetailByItem(item: DatasetEvalItem) {
   if (!item.latest_evaluation) return
+  dialogDataset.value = item
   await openDetailById(item.latest_evaluation.id)
 }
 
@@ -197,6 +201,7 @@ async function openDetailById(id: number | string) {
 function closeDialog() {
   dialogOpen.value = false
   dialogEvaluation.value = null
+  dialogDataset.value = null
 }
 
 // ───────── 初始加载 ─────────
