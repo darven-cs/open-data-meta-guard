@@ -4,7 +4,7 @@
 - id              : BIGSERIAL PK (job_id)
 - dataset_id      : sha256(url) 64 位 hex
 - status          : pending / running / completed / failed / cancelled
-- evaluation_id   : 成功后写入的 meta_evaluations.id
+- evaluation_id   : UUID4 字符串，触发时预分配（无 FK）
 - error           : 失败/取消原因
 - elapsed_ms      : 总耗时
 - token_prompt    : LLM prompt tokens
@@ -60,10 +60,10 @@ class MetaEvaluationJob(Base):
         server_default=text("'pending'"),
         comment="pending / running / completed / failed / cancelled",
     )
-    evaluation_id: Mapped[int | None] = mapped_column(
-        BigInteger,
+    evaluation_id: Mapped[str | None] = mapped_column(
+        String(36),
         nullable=True,
-        comment="成功后写入的 meta_evaluations.id",
+        comment="UUID4 字符串，触发时预分配（无 FK）",
     )
     error: Mapped[str | None] = mapped_column(
         Text,

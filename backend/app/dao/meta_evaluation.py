@@ -24,9 +24,10 @@ def _to_dict(ev: MetaEvaluation) -> dict[str, Any]:
     """ORM → dict（序列化为 API 友好格式）。
 
     JSONB 列在 SQLAlchemy 中读出来就是 dict；datetime 转 ISO string。
+    id 强转 str 以兼容 PG column type 与 ORM 类型声明不一致的过渡期。
     """
     return {
-        "id": ev.id,
+        "id": str(ev.id) if ev.id is not None else None,
         "dataset_id": ev.dataset_id,
         "score_total": ev.score_total,
         "score_discover": ev.score_discover,
@@ -48,6 +49,7 @@ def _to_dict(ev: MetaEvaluation) -> dict[str, Any]:
 
 async def create_evaluation(
     session: AsyncSession,
+    evaluation_id: str,
     dataset_id: str,
     score_total: int,
     score_discover: int,
@@ -65,12 +67,15 @@ async def create_evaluation(
 
     Args:
         session: 由 Depends(get_db) 注入
+        evaluation_id: 外部预分配的 UUID 字符串
         其余 11 个字段对齐 meta_evaluations 表
 
     Returns:
-        {"ok": True, "evaluation_id": int}
+        {"ok": True, "evaluation_id": str}
         {"ok": False, "error": "..."}
     """
+    if not evaluation_id:
+        return {"ok": False, "error": "evaluation_id is required"}
     if not dataset_id:
         return {"ok": False, "error": "dataset_id is required"}
     if not grade:
@@ -79,6 +84,7 @@ async def create_evaluation(
         return {"ok": False, "error": "evaluation_content is required"}
 
     ev = MetaEvaluation(
+        id=evaluation_id,
         dataset_id=dataset_id,
         score_total=score_total,
         score_discover=score_discover,
@@ -105,7 +111,7 @@ async def create_evaluation(
 
 async def get_evaluation(
     session: AsyncSession,
-    evaluation_id: int,
+    evaluation_id: str,
 ) -> dict:
     """按 id 查 evaluation 完整字段。
 
@@ -251,7 +257,7 @@ async def list_datasets_with_latest_evaluation(
     eval_map: dict[str, dict[str, Any]] = {}
     for row in eval_result:
         eval_map[row.dataset_id] = {
-            "id": row.id,
+            "id": str(row.id) if row.id is not None else None,
             "score_total": row.score_total,
             "grade": row.grade,
             "created_at": row.created_at.isoformat() if row.created_at else None,

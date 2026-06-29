@@ -1,7 +1,7 @@
 """meta_evaluations 表 — EU MQA 405 分制评估结果。
 
 字段：
-- id                : BIGSERIAL PK
+- id                : VARCHAR(36) PK（UUID4，app 层预分配）
 - dataset_id        : sha256(url) 64 位 hex（无 FK）
 - score_total       : 0..405
 - score_discover    : 0..100  Findability
@@ -22,7 +22,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, func, text
+from sqlalchemy import DateTime, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,10 +34,10 @@ class MetaEvaluation(Base):
 
     __tablename__ = "meta_evaluations"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger,
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        autoincrement=True,
+        comment="UUID4 字符串，由 app 层在触发时生成",
     )
     dataset_id: Mapped[str] = mapped_column(
         String(64),

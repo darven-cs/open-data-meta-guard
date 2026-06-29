@@ -28,7 +28,7 @@ class EvaluateResponse(BaseModel):
     """POST /evaluations 响应体（触发评估后返回新生成的 evaluation_id）。"""
 
     ok: bool = Field(description="整体成功标记")
-    evaluation_id: int = Field(description="新写入的 evaluation id")
+    evaluation_id: str = Field(description="新写入的 evaluation id（UUID4 字符串）")
     dataset_id: str = Field(description="被评估的 dataset id")
     score_total: int = Field(description="总分（0-405）")
     grade: str = Field(description="Excellent / Good / Sufficient / Bad")
@@ -38,7 +38,7 @@ class EvaluateResponse(BaseModel):
 class EvaluationListItem(BaseModel):
     """GET /evaluations 列表单条。"""
 
-    id: int
+    id: str
     dataset_id: str
     score_total: int
     grade: str
@@ -57,7 +57,7 @@ class EvaluationListResponse(BaseModel):
 class EvaluationDetail(BaseModel):
     """GET /evaluations/{evaluation_id} 详情响应。"""
 
-    id: int
+    id: str
     dataset_id: str
     score_total: int
     score_discover: int
@@ -79,7 +79,7 @@ class EvaluationDetail(BaseModel):
 class LatestEvaluation(BaseModel):
     """dataset 的最新一次 evaluation 摘要（用于评估页行内展示）。"""
 
-    id: int
+    id: str
     score_total: int
     grade: str
     created_at: Optional[str] = None
@@ -120,9 +120,9 @@ class EvaluateJobResponse(BaseModel):
     status: str = Field(
         description="pending / running / completed / failed / cancelled",
     )
-    evaluation_id: Optional[int] = Field(
+    evaluation_id: Optional[str] = Field(
         default=None,
-        description="成功后写入的 meta_evaluations.id",
+        description="UUID4 字符串，触发时预分配",
     )
     error: Optional[str] = Field(default=None, description="失败/取消原因")
     elapsed_ms: Optional[int] = Field(default=None, description="总耗时（ms）")
@@ -140,7 +140,7 @@ class JobListItem(BaseModel):
     job_id: int
     dataset_id: str
     status: str
-    evaluation_id: Optional[int] = None
+    evaluation_id: Optional[str] = None
     error: Optional[str] = None
     elapsed_ms: Optional[int] = None
     token_total: Optional[int] = None

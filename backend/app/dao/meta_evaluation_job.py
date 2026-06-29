@@ -19,12 +19,15 @@ from app.model.meta_evaluation_job import MetaEvaluationJob
 
 
 def _to_dict(job: MetaEvaluationJob) -> dict[str, Any]:
-    """ORM → dict（序列化为 API 友好格式）。"""
+    """ORM → dict（序列化为 API 友好格式）。
+
+    evaluation_id 强转 str 以兼容 PG column type 与 ORM 类型声明不一致的过渡期。
+    """
     return {
         "id": job.id,
         "dataset_id": job.dataset_id,
         "status": job.status,
-        "evaluation_id": job.evaluation_id,
+        "evaluation_id": str(job.evaluation_id) if job.evaluation_id is not None else None,
         "error": job.error,
         "elapsed_ms": job.elapsed_ms,
         "token_prompt": job.token_prompt,
@@ -41,12 +44,26 @@ def _to_dict(job: MetaEvaluationJob) -> dict[str, Any]:
 # ──────────────────────── 公共 ────────────────────────
 
 
-async def create_job(session: AsyncSession, dataset_id: str) -> dict:
-    """新建一条 pending job。"""
+async def create_job(
+    session: AsyncSession,
+    dataset_id: str,
+    evaluation_id: str,
+) -> dict:
+    """新建一条 pending job，并预绑定 evaluation_id（UUID 字符串）。
+
+    evaluation_id 由 route 层在触发时生成，service 层后续 INSERT meta_evaluations
+    时复用同一 ID，实现前端从触发瞬间起就持有稳定的 evaluation_id。
+    """
     if not dataset_id:
         return {"ok": False, "error": "dataset_id is required"}
+    if not evaluation_id:
+        return {"ok": False, "error": "evaluation_id is required"}
 
-    job = MetaEvaluationJob(dataset_id=dataset_id, status="pending")
+    job = MetaEvaluationJob(
+        dataset_id=dataset_id,
+        evaluation_id=evaluation_id,
+        status="pending",
+    )
     session.add(job)
     await session.commit()
     await session.refresh(job)
@@ -142,7 +159,7 @@ async def mark_running(session: AsyncSession, job_id: int, started_at: datetime)
 async def mark_completed(
     session: AsyncSession,
     job_id: int,
-    evaluation_id: int,
+    evaluation_id: str,
     *,
     elapsed_ms: int | None = None,
     token_prompt: int | None = None,

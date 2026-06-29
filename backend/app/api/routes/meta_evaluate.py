@@ -1,7 +1,7 @@
 """元数据评估 API 路由（v2.0 async + tracing）。
 
 路由（prefix=`/meta-evaluate`）：
-    POST   /evaluations                 触发评估（202 立即返 job_id）
+    POST   /evaluations                 触发评估（202 立即返 job_id + evaluation_id）
     GET    /evaluations/jobs/{job_id}    查 job 状态
     DELETE /evaluations/jobs/{job_id}    取消运行中的 job
     GET    /evaluations/by-job/{job_id}  job 完成后拿 evaluation 详情
@@ -10,6 +10,8 @@
     GET    /datasets                     datasets + 最新 evaluation 摘要（兼容）
     GET    /jobs                         按 dataset_id 拉 jobs（可选）
 """
+import uuid
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,7 +71,8 @@ async def trigger_evaluate(
 ):
     """触发一次元数据评估（异步）。
 
-    立即返 202 + {job_id, status: pending}；worker 后台调度实际评估。
+    立即返 202 + {job_id, evaluation_id}；worker 后台调度实际评估。
+    evaluation_id 在触发时由 app 层预分配（UUID4），前端从触发瞬间起就持有稳定 ID。
     前端用 GET /evaluations/jobs/{job_id} 轮询状态。
     """
     # 先确认 dataset 存在（避免 enqueue 一个永远跑不出来的 job）
@@ -79,7 +82,14 @@ async def trigger_evaluate(
     if not ds_check.get("ok"):
         return ResponseModel.fail(code=404, msg=ds_check.get("error", "dataset not found"))
 
-    create_res = await job_dao.create_job(session=session, dataset_id=body.dataset_id)
+    # 预分配 evaluation_id（UUID4），立即绑定到 job；worker INSERT meta_evaluations 时复用
+    preallocated_id = str(uuid.uuid4())
+
+    create_res = await job_dao.create_job(
+        session=session,
+        dataset_id=body.dataset_id,
+        evaluation_id=preallocated_id,
+    )
     if not create_res.get("ok"):
         return ResponseModel.fail(
             code=500, msg=create_res.get("error", "create_job failed"),
@@ -91,7 +101,7 @@ async def trigger_evaluate(
             "id": job_id,
             "dataset_id": body.dataset_id,
             "status": "pending",
-            "evaluation_id": None,
+            "evaluation_id": preallocated_id,
             "error": None,
             "elapsed_ms": None,
             "token_prompt": None,
@@ -265,10 +275,13 @@ async def list_evaluate_jobs(
     response_model=ResponseModel,
 )
 async def get_evaluation(
-    evaluation_id: int,
+    evaluation_id: str,
     session: AsyncSession = Depends(get_db),
 ):
-    """单条 evaluation 详情（含 5 维分 + rule_scores + Markdown 报告）。"""
+    """单条 evaluation 详情（含 5 维分 + rule_scores + Markdown 报告）。
+
+    evaluation_id 为 UUID4 字符串（新数据）或迁移后的数字字符串（旧数据）。
+    """
     result = await meta_eval_dao.get_evaluation(
         session=session,
         evaluation_id=evaluation_id,

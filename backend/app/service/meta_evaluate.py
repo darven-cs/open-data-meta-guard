@@ -85,7 +85,23 @@ async def evaluate_with_tracing(
             raise
 
     async with AsyncSessionLocal() as session:
-        # 0) load_dataset
+        # 0a) 读 job 拿预分配的 evaluation_id（UUID4）
+        job_res = await job_dao.get_job(session=session, job_id=job_id)
+        if not job_res.get("ok"):
+            await _write_failed(
+                job_id, f"get_job failed: {job_res.get('error', 'unknown')}",
+                stats, _elapsed_ms_since(total_start),
+            )
+            return {"ok": False, "error": "job not found", "stats": stats}
+        preallocated_id = job_res["job"].get("evaluation_id")
+        if not preallocated_id:
+            await _write_failed(
+                job_id, "job missing preallocated evaluation_id",
+                stats, _elapsed_ms_since(total_start),
+            )
+            return {"ok": False, "error": "job missing evaluation_id", "stats": stats}
+
+        # 0b) load_dataset
         async def _load():
             ds_res = await dataset_dao.get_dataset(session=session, dataset_id=dataset_id)
             if not ds_res.get("ok"):
@@ -126,7 +142,10 @@ async def evaluate_with_tracing(
         )
         try:
             raw_result = await asyncio.wait_for(
-                agent.ainvoke({"messages": [{"role": "user", "content": payload}]}),
+                agent.ainvoke(
+                    {"messages": [{"role": "user", "content": payload}]},
+                    config={"recursion_limit": settings.meta_evaluate_agent_recursion_limit},
+                ),
                 timeout=timeout,
             )
         except asyncio.CancelledError:
@@ -148,6 +167,22 @@ async def evaluate_with_tracing(
             await _write_failed(job_id, err, stats, elapsed)
             return {"ok": False, "error": err, "stats": stats}
         except Exception as e:
+            # GraphRecursionError 是 agent 在 config.recursion_limit 步内没走到终止条件
+            # （多半是 LLM 反复调 tool 但从不调 MetaEvaluateResult 返回）
+            from langgraph.errors import GraphRecursionError
+            if isinstance(e, GraphRecursionError):
+                elapsed = _elapsed_ms_since(total_start)
+                stats["phase_ms"]["invoke_agent"] = _elapsed_ms_since(t_invoke)
+                logger.warning(
+                    "[meta-evaluate] job={} phase=invoke_agent recursion_limit={} reached without stop",
+                    job_id, settings.meta_evaluate_agent_recursion_limit,
+                )
+                err = (
+                    f"agent recursion_limit={settings.meta_evaluate_agent_recursion_limit} "
+                    "reached without hitting MetaEvaluateResult"
+                )
+                await _write_failed(job_id, err, stats, elapsed)
+                return {"ok": False, "error": err, "stats": stats}
             elapsed = _elapsed_ms_since(total_start)
             stats["phase_ms"]["invoke_agent"] = _elapsed_ms_since(t_invoke)
             tb = traceback.format_exc(limit=3)
@@ -234,6 +269,7 @@ async def evaluate_with_tracing(
             async def _create():
                 return await meta_eval_dao.create_evaluation(
                     session=write_session,
+                    evaluation_id=preallocated_id,
                     dataset_id=dataset_id,
                     score_total=int(eval_result.score_total),
                     score_discover=int(eval_result.score_discover),
@@ -309,7 +345,7 @@ async def list_evaluations(
 
 async def _write_completed(
     job_id: int,
-    evaluation_id: int,
+    evaluation_id: str,
     stats: dict,
     elapsed_ms: int,
 ) -> None:

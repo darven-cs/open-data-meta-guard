@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     meta_evaluate_stale_threshold_sec: int = Field(default=300)
     # reason_content / tool_calls 日志截断阈值（字节）
     meta_evaluate_log_truncate_bytes: int = Field(default=16 * 1024)
+    # agent 循环上限（防止 tool_call 死循环拖到 180s 超时）
+    meta_evaluate_agent_recursion_limit: int = Field(default=15)
 
     # ---------- 计算属性 ----------
     @computed_field  # type: ignore[prop-decorator]
