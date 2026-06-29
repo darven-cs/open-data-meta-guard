@@ -14,6 +14,7 @@
     page-change : (page)
     view        : (item)   — 已评估行「查看评估」按钮
     trigger     : (item)   — 未评估行「触发评估」按钮
+    reevaluate  : (item)   — 已评估行「重新评估」按钮
 -->
 <template>
   <div class="evaluation-list">
@@ -91,15 +92,23 @@
           >
             评估中…
           </button>
-          <!-- 已评估：查看 -->
-          <button
-            v-else-if="it.latest_evaluation"
-            type="button"
-            class="evaluation-list__btn evaluation-list__btn--view"
-            @click="emit('view', it)"
-          >
-            查看评估
-          </button>
+          <!-- 已评估：查看 + 重新评估（并排） -->
+          <template v-else-if="it.latest_evaluation">
+            <button
+              type="button"
+              class="evaluation-list__btn evaluation-list__btn--view"
+              @click="emit('view', it)"
+            >
+              查看评估
+            </button>
+            <button
+              type="button"
+              class="evaluation-list__btn evaluation-list__btn--reevaluate"
+              @click="emit('reevaluate', it)"
+            >
+              重新评估
+            </button>
+          </template>
           <!-- 未评估：触发 -->
           <button
             v-else
@@ -153,6 +162,7 @@ const emit = defineEmits<{
   'page-change': [page: number]
   view: [item: DatasetEvalItem]
   trigger: [item: DatasetEvalItem]
+  reevaluate: [item: DatasetEvalItem]
 }>()
 
 const evaluatingIds = computed(() => props.evaluatingIds ?? new Set<string>())
@@ -227,7 +237,7 @@ function formatTime(iso: string | null): string {
 .evaluation-list__head,
 .evaluation-list__row {
   display: grid;
-  grid-template-columns: minmax(280px, 2fr) 100px minmax(220px, 1.5fr) 130px;
+  grid-template-columns: minmax(280px, 2fr) 100px minmax(220px, 1.5fr) 180px;
   gap: var(--sp-3);
   align-items: center;
   padding: var(--sp-2) var(--sp-3);
@@ -262,6 +272,16 @@ function formatTime(iso: string | null): string {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.evaluation-list__col--action {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.evaluation-list__col--action > .evaluation-list__btn {
+  flex: 0 0 auto;
 }
 
 .evaluation-list__link {
@@ -416,6 +436,17 @@ function formatTime(iso: string | null): string {
   color: var(--success);
 }
 
+.evaluation-list__btn--reevaluate {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.evaluation-list__btn--reevaluate:hover:not(:disabled) {
+  border-color: var(--warning);
+  color: var(--paper);
+  background: var(--warning);
+  filter: none;
+}
+
 .evaluation-list__btn--loading {
   background: var(--paper-sub);
   border-color: var(--hairline-strong);
@@ -478,7 +509,7 @@ function formatTime(iso: string | null): string {
 @media (max-width: 960px) {
   .evaluation-list__head,
   .evaluation-list__row {
-    grid-template-columns: minmax(220px, 1.6fr) 90px minmax(180px, 1fr) 110px;
+    grid-template-columns: minmax(220px, 1.6fr) 90px minmax(180px, 1fr) 160px;
   }
 }
 </style>

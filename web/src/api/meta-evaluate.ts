@@ -115,14 +115,20 @@ export interface DatasetEvalListResponse {
   count: number
 }
 
-/** 触发评估响应 */
-export interface EvaluateResponse {
-  ok: boolean
-  evaluation_id: number
+/** 触发评估 / job 状态响应（异步 job 模型） */
+export interface EvaluateJobResponse {
+  job_id: number
   dataset_id: string
-  score_total: number
-  grade: string
-  created_at: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | string
+  evaluation_id: string | null
+  error: string | null
+  elapsed_ms: number | null
+  token_prompt: number | null
+  token_completion: number | null
+  token_total: number | null
+  created_at: string | null
+  started_at: string | null
+  finished_at: string | null
 }
 
 /** ResponseModel 通用包装 */
@@ -142,18 +148,24 @@ async function unwrap<T>(res: Response): Promise<T> {
   return json.data
 }
 
-/** 触发一次评估（同步阻塞 30-60s） */
-export async function triggerEvaluate(datasetId: string): Promise<EvaluateResponse> {
+/** 触发一次评估（异步，立即返回 job_id） */
+export async function triggerEvaluate(datasetId: string): Promise<EvaluateJobResponse> {
   const res = await fetch(`${BASE}/evaluations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ dataset_id: datasetId }),
   })
-  return unwrap<EvaluateResponse>(res)
+  return unwrap<EvaluateJobResponse>(res)
+}
+
+/** 查询评估 job 状态 */
+export async function getEvaluationJob(jobId: number): Promise<EvaluateJobResponse> {
+  const res = await fetch(`${BASE}/evaluations/jobs/${jobId}`)
+  return unwrap<EvaluateJobResponse>(res)
 }
 
 /** 单 evaluation 详情 */
-export async function getEvaluation(id: number): Promise<EvaluationDetail> {
+export async function getEvaluation(id: number | string): Promise<EvaluationDetail> {
   const res = await fetch(`${BASE}/evaluations/${id}`)
   return unwrap<EvaluationDetail>(res)
 }
