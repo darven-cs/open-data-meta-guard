@@ -17,9 +17,6 @@
         <span class="meta-evaluate-view__eyebrow-mute">Metadata Evaluation</span>
       </p>
       <h1 class="meta-evaluate-view__title">元数据评估</h1>
-      <p class="meta-evaluate-view__lead">
-        基于欧盟 MQA 405 分制.点击行右侧按钮触发评估或查看已有报告。
-      </p>
     </header>
 
     <hr class="meta-evaluate-view__rule" />

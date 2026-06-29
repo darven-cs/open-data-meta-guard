@@ -36,6 +36,7 @@ dependencies = [
     "asyncpg>=0.29",
     "alembic>=1.18.4",
     "python-multipart>=0.0.9",
+    "pandas>=2.0.0",
 ]
 
 [project.scripts]

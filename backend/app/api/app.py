@@ -23,6 +23,7 @@ from app.api.routes import health
 from app.api.routes import meta_collect  # Phase 1
 from app.api.routes import meta_evaluate  # Phase 2
 from app.api.routes import data_collect  # Phase 3
+from app.api.routes import data_quality  # Phase 4
 
 
 def create_app():
@@ -48,4 +49,6 @@ def create_app():
     app.include_router(meta_evaluate.router)
     # Phase 3: data_collect
     app.include_router(data_collect.router)
+    # Phase 4: data_quality
+    app.include_router(data_quality.router)
     return app

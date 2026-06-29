@@ -17,9 +17,6 @@
         <span class="data-collect-view__eyebrow-mute">Data Upload</span>
       </p>
       <h1 class="data-collect-view__title">数据采集</h1>
-      <p class="data-collect-view__lead">
-        查看已采集的 dataset，上传 csv / xlsx / json 数据文件。
-      </p>
     </header>
 
     <hr class="data-collect-view__rule" />
