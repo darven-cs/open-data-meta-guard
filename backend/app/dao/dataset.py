@@ -39,6 +39,7 @@ def _to_dict(ds: Dataset) -> dict:
         "url": ds.url,
         "metadata": ds.metadata_ or {},
         "status": ds.status,
+        "has_uploaded": ds.has_uploaded,
         "created_at": ds.created_at.isoformat() if ds.created_at else None,
         "updated_at": ds.updated_at.isoformat() if ds.updated_at else None,
     }
@@ -220,3 +221,30 @@ async def delete_dataset(
         await session.rollback()
         return {"ok": False, "error": f"delete_dataset integrity error: {e}"}
     return {"ok": True, "dataset_id": dataset_id, "deleted": True}
+
+
+async def set_has_uploaded(
+    session: AsyncSession,
+    dataset_id: str,
+    flag: bool,
+) -> dict:
+    """翻转 dataset.has_uploaded 布尔位（Phase 3 上传/删除时用）。
+
+    Returns:
+        {"ok": True, "dataset_id": "..."}
+        {"ok": False, "error": "dataset not found: ..." | ...}
+    """
+    if not dataset_id:
+        return {"ok": False, "error": "dataset_id is required"}
+
+    ds = await session.get(Dataset, dataset_id)
+    if ds is None:
+        return {"ok": False, "error": f"dataset not found: {dataset_id}"}
+
+    ds.has_uploaded = bool(flag)
+    try:
+        await session.commit()
+    except IntegrityError as e:
+        await session.rollback()
+        return {"ok": False, "error": f"set_has_uploaded integrity error: {e}"}
+    return {"ok": True, "dataset_id": dataset_id}

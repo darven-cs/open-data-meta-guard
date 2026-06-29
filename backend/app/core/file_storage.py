@@ -59,6 +59,7 @@ def ensure_data_dirs() -> None:
     sub_dirs = [
         base / "raw",
         base / "cleaned",
+        base / "uploads",
         base / "reports" / "meta_evaluate",
         base / "reports" / "quality",
     ]

@@ -21,7 +21,7 @@ datasets 表 — 抓取的原始元数据（根表）。
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Index, String, Text, func, text
+from sqlalchemy import Boolean, DateTime, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,6 +52,12 @@ class Dataset(Base):
         nullable=False,
         server_default=text("'pending'"),
         comment="pending / scraped / failed",
+    )
+    has_uploaded: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+        comment="是否已上传过 data file（Phase 3 标记）",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
