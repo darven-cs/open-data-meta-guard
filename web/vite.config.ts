@@ -16,7 +16,11 @@ export default defineConfig({
       '/api': {                                    // 匹配 /api 开头的请求
         target: 'http://localhost:8001',           // 转发到后端 (uvicorn 8001)
         changeOrigin: true,                        // 改 Host header
-        rewrite: (path) => path.replace(/^\/api/, ''),  // 去掉 /api 前缀
+        rewrite: (path) => {
+          // /api/charts/* 不剥 /api 前缀（后端 mount 在 /api/charts）
+          if (path.startsWith('/api/charts')) return path
+          return path.replace(/^\/api/, '')
+        },
       },
     },
   },

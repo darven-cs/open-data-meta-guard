@@ -57,6 +57,24 @@ md.renderer.rules.table_close = function () {
     return '</table>\n</div>'
 }
 
+// 图片 src 改写:相对路径 charts/... → /api/charts/...
+// 否则浏览器按前端 URL 解析 → 404
+const defaultImage = md.renderer.rules.image || function (tokens, idx, options, _env, self) {
+    return self.renderToken(tokens, idx, options)
+}
+md.renderer.rules.image = function (tokens, idx, options, env, self) {
+    const token = tokens[idx]
+    const srcIdx = token.attrIndex('src')
+    if (srcIdx >= 0) {
+        const src = token.attrs![srcIdx][1]
+        // 仅改写后端 chart 路径(charts/<dataset_id>/<file>.png)
+        if (src.startsWith('charts/') && !src.startsWith('/')) {
+            token.attrs![srcIdx][1] = '/api/' + src
+        }
+    }
+    return defaultImage(tokens, idx, options, env, self)
+}
+
 /**
  * DOMPurify sanitize 配置 —— XSS 第二道防线
  *
