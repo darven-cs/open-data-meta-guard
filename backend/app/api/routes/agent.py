@@ -26,8 +26,8 @@ from app.dao import chat as chat_dao
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
-# 最大工具调用轮次（防死循环）
-MAX_TOOL_ROUNDS = 5
+# 最大工具调用轮次（纯安全网，LLM 无 tool_calls 时会自动 break）
+MAX_TOOL_ROUNDS = 15
 
 # ───────── SSE helpers ─────────
 
