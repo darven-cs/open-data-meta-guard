@@ -117,31 +117,21 @@
       </div>
     </div>
 
-    <div v-if="totalPages > 1" class="dataset-collect-list__pager">
-      <button
-        type="button"
-        class="dataset-collect-list__page-btn"
-        :disabled="page <= 1"
-        @click="emit('page-change', page - 1)"
-      >
-        ← 上一页
-      </button>
-      <span class="dataset-collect-list__page-info">{{ page }} / {{ totalPages }}</span>
-      <button
-        type="button"
-        class="dataset-collect-list__page-btn"
-        :disabled="page >= totalPages"
-        @click="emit('page-change', page + 1)"
-      >
-        下一页 →
-      </button>
-    </div>
+    <Pager
+      :page="page"
+      :size="size"
+      :total="total ?? count"
+      :loading="loading"
+      @page-change="(p: number) => emit('page-change', p)"
+      @size-change="(s: number) => emit('size-change', s)"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { DatasetSelectItem } from '@/api/data-collect'
+import Pager from '@/components/common/Pager.vue'
 
 const props = defineProps<{
   items: DatasetSelectItem[]
@@ -155,16 +145,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'page-change': [page: number]
+  'size-change': [size: number]
   upload: [item: DatasetSelectItem]
   view: [item: DatasetSelectItem]
 }>()
 
 const uploadingIds = computed(() => props.uploadingIds ?? new Set<string>())
-
-const totalPages = computed(() => {
-  const t = props.total ?? props.count
-  return Math.max(1, Math.ceil(t / props.size))
-})
 
 function truncate(s: string, max: number): string {
   if (!s) return ''
@@ -399,36 +385,6 @@ function statusBadge(s: string): string {
   font-size: var(--text-sm);
   color: var(--ink-mute);
   z-index: 1;
-}
-
-.dataset-collect-list__pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) 0;
-}
-
-.dataset-collect-list__page-btn {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--hairline-strong);
-  background: var(--paper);
-  color: var(--ink);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.dataset-collect-list__page-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.dataset-collect-list__page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.dataset-collect-list__page-info {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink-mute);
 }
 
 @media (max-width: 960px) {

@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.log import logger
+from app.dao._paginate import paginate
 from app.model.data_download import DataDownload
 
 
@@ -113,30 +114,26 @@ async def list_by_dataset(
     page: int = 1,
     size: int = 20,
 ) -> dict:
-    """按 dataset_id 分页列出（按 created_at DESC）。"""
+    """按 dataset_id 分页列出（按 created_at DESC）。
+
+    count 为匹配 WHERE 的**总条数**（非当前页条数）。
+    """
     if not dataset_id:
         return {"ok": False, "error": "dataset_id is required"}
-    if page < 1:
-        page = 1
-    if size < 1 or size > 100:
-        size = 20
 
     stmt = (
         select(DataDownload)
         .where(DataDownload.dataset_id == dataset_id)
         .order_by(DataDownload.created_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
     )
-    result = await session.execute(stmt)
-    rows = result.scalars().all()
+    res = await paginate(session, stmt, page, size)
 
     return {
         "ok": True,
-        "items": [_to_dict(r) for r in rows],
-        "page": page,
-        "size": size,
-        "count": len(rows),
+        "items": [_to_dict(r) for r in res["items"]],
+        "page": res["page"],
+        "size": res["size"],
+        "count": res["count"],
     }
 
 

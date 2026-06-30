@@ -18,6 +18,7 @@ from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dao._paginate import paginate
 from app.model.dataset import Dataset
 
 
@@ -138,26 +139,19 @@ async def list_datasets(
 
     Returns:
         {"ok": True, "items": [...], "page": int, "size": int, "count": int}
+        count 是匹配 WHERE 的**总条数**（非当前页条数），用于前端分页计算。
     """
-    if page < 1:
-        page = 1
-    if size < 1 or size > 100:
-        size = 20
-
     stmt = select(Dataset).order_by(Dataset.created_at.desc())
     if status:
         stmt = stmt.where(Dataset.status == status)
-    stmt = stmt.offset((page - 1) * size).limit(size)
-
-    result = await session.execute(stmt)
-    rows = result.scalars().all()
+    res = await paginate(session, stmt, page, size)
 
     return {
         "ok": True,
-        "items": [_to_dict(ds) for ds in rows],
-        "page": page,
-        "size": size,
-        "count": len(rows),
+        "items": [_to_dict(ds) for ds in res["items"]],
+        "page": res["page"],
+        "size": res["size"],
+        "count": res["count"],
     }
 
 

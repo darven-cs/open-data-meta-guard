@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dao import dataset as dataset_dao
+from app.dao._paginate import paginate
 from app.model.dataset import Dataset
 from app.model.meta_evaluation import MetaEvaluation
 
@@ -145,13 +146,10 @@ async def list_evaluations(
 
     Returns:
         {"ok": True, "items": [...], "page": int, "size": int, "count": int}
+        count 为匹配 WHERE 的**总条数**（非当前页条数）。
     """
     if not dataset_id:
         return {"ok": False, "error": "dataset_id is required"}
-    if page < 1:
-        page = 1
-    if size < 1 or size > 100:
-        size = 20
 
     stmt = (
         select(MetaEvaluation)
@@ -160,17 +158,14 @@ async def list_evaluations(
     )
     if grade:
         stmt = stmt.where(MetaEvaluation.grade == grade)
-    stmt = stmt.offset((page - 1) * size).limit(size)
-
-    result = await session.execute(stmt)
-    rows = result.scalars().all()
+    res = await paginate(session, stmt, page, size)
 
     return {
         "ok": True,
-        "items": [_to_dict(ev) for ev in rows],
-        "page": page,
-        "size": size,
-        "count": len(rows),
+        "items": [_to_dict(ev) for ev in res["items"]],
+        "page": res["page"],
+        "size": res["size"],
+        "count": res["count"],
     }
 
 
@@ -199,7 +194,7 @@ async def list_datasets_with_latest_evaluation(
     用于元数据评估页：直接展示 datasets 列表，每行带评估状态 + 触发按钮。
 
     实现：
-        1) 先按 status 过滤分页查 datasets（按 created_at DESC）
+        1) 用 paginate() 一次查 datasets（带 COUNT(*)）按 created_at DESC
         2) 用 window function (row_number) 一次查所有 dataset_id 的最新 evaluation
         3) 拼装成 items，latest_evaluation=None 表示未评估
 
@@ -210,23 +205,24 @@ async def list_datasets_with_latest_evaluation(
 
     Returns:
         {"ok": True, "items": [...], "page": int, "size": int, "count": int}
+        count 为匹配 WHERE 的 datasets **总条数**（非当前页条数）。
     """
-    if page < 1:
-        page = 1
-    if size < 1 or size > 100:
-        size = 20
-
-    # 1) datasets 分页
+    # 1) datasets 分页 + 真总数
     ds_stmt = select(Dataset).order_by(Dataset.created_at.desc())
     if status:
         ds_stmt = ds_stmt.where(Dataset.status == status)
-    ds_stmt = ds_stmt.offset((page - 1) * size).limit(size)
-
-    ds_result = await session.execute(ds_stmt)
-    datasets = ds_result.scalars().all()
+    res = await paginate(session, ds_stmt, page, size)
+    datasets = res["items"]
+    total = res["count"]
 
     if not datasets:
-        return {"ok": True, "items": [], "page": page, "size": size, "count": 0}
+        return {
+            "ok": True,
+            "items": [],
+            "page": res["page"],
+            "size": res["size"],
+            "count": total,
+        }
 
     dataset_ids = [d.id for d in datasets]
 
@@ -273,7 +269,7 @@ async def list_datasets_with_latest_evaluation(
     return {
         "ok": True,
         "items": items,
-        "page": page,
-        "size": size,
-        "count": len(items),
+        "page": res["page"],
+        "size": res["size"],
+        "count": total,
     }

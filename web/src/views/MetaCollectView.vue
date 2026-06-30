@@ -70,6 +70,7 @@
       :total="totalHint"
       :loading="loading"
       @page-change="onPageChange"
+      @size-change="onSizeChange"
       @view="openView"
       @edit="openEdit"
       @remove="onDelete"
@@ -216,6 +217,12 @@ function onFilterChange() {
 
 function onPageChange(p: number) {
   page.value = p
+  void refresh()
+}
+
+function onSizeChange(s: number) {
+  size.value = s
+  page.value = 1
   void refresh()
 }
 

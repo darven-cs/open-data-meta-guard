@@ -49,6 +49,7 @@
       :loading="loading"
       :uploading-ids="uploadingIds"
       @page-change="onPageChange"
+      @size-change="onSizeChange"
       @upload="onUpload"
       @view="onView"
     />
@@ -119,6 +120,12 @@ async function refresh() {
 
 function onPageChange(p: number) {
   page.value = p
+  void refresh()
+}
+
+function onSizeChange(s: number) {
+  size.value = s
+  page.value = 1
   void refresh()
 }
 

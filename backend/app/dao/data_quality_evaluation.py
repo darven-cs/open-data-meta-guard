@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dao._paginate import paginate
 from app.model.data_download import DataDownload
 from app.model.data_quality_evaluation import DataQualityEvaluation
 
@@ -118,30 +119,24 @@ async def list_evaluations(
 
     Returns:
         {"ok": True, "items": [...], "page": int, "size": int, "count": int}
+        count 为匹配 WHERE 的**总条数**（非当前页条数）。
     """
     if not dataset_id:
         return {"ok": False, "error": "dataset_id is required"}
-    if page < 1:
-        page = 1
-    if size < 1 or size > 100:
-        size = 20
 
     stmt = (
         select(DataQualityEvaluation)
         .where(DataQualityEvaluation.dataset_id == dataset_id)
         .order_by(DataQualityEvaluation.created_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
     )
-    result = await session.execute(stmt)
-    rows = result.scalars().all()
+    res = await paginate(session, stmt, page, size)
 
     return {
         "ok": True,
-        "items": [_to_dict(ev) for ev in rows],
-        "page": page,
-        "size": size,
-        "count": len(rows),
+        "items": [_to_dict(ev) for ev in res["items"]],
+        "page": res["page"],
+        "size": res["size"],
+        "count": res["count"],
     }
 
 
@@ -153,30 +148,28 @@ async def list_downloads_with_latest_evaluation(
     """data_downloads 分页列表 + 每条最新 quality eval 摘要。
 
     实现：
-        1) 分页查 data_downloads（按 created_at DESC）
+        1) 用 paginate() 一次查 data_downloads（带 COUNT(*)）按 created_at DESC
         2) window function 一次查所有 data_download_id 的最新 evaluation
         3) 拼装 items
 
     Returns:
         {"ok": True, "items": [...], "page": int, "size": int, "count": int}
+        count 为匹配 downloads 的**总条数**（非当前页条数）。
     """
-    if page < 1:
-        page = 1
-    if size < 1 or size > 100:
-        size = 20
-
-    # 1) data_downloads 分页
-    dl_stmt = (
-        select(DataDownload)
-        .order_by(DataDownload.created_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
-    )
-    dl_result = await session.execute(dl_stmt)
-    downloads = dl_result.scalars().all()
+    # 1) data_downloads 分页 + 真总数
+    dl_stmt = select(DataDownload).order_by(DataDownload.created_at.desc())
+    res = await paginate(session, dl_stmt, page, size)
+    downloads = res["items"]
+    total = res["count"]
 
     if not downloads:
-        return {"ok": True, "items": [], "page": page, "size": size, "count": 0}
+        return {
+            "ok": True,
+            "items": [],
+            "page": res["page"],
+            "size": res["size"],
+            "count": total,
+        }
 
     dl_ids = [d.id for d in downloads]
 
@@ -224,7 +217,7 @@ async def list_downloads_with_latest_evaluation(
     return {
         "ok": True,
         "items": items,
-        "page": page,
-        "size": size,
-        "count": len(items),
+        "page": res["page"],
+        "size": res["size"],
+        "count": total,
     }
