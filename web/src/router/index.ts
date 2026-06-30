@@ -7,6 +7,7 @@ import MetaCollectView from '@/views/MetaCollectView.vue'
 import MetaEvaluateView from '@/views/MetaEvaluateView.vue'
 import DataCollectView from '@/views/DataCollectView.vue'
 import DataQualityView from '@/views/DataQualityView.vue'
+import KnowledgeGraphView from '@/views/KnowledgeGraphView.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -45,6 +46,12 @@ const routes: RouteRecordRaw[] = [
     name: 'data-quality',
     component: DataQualityView,
     meta: { layout: 'admin', title: '数据质量评估' },
+  },
+  {
+    path: '/kg',
+    name: 'kg',
+    component: KnowledgeGraphView,
+    meta: { layout: 'admin', title: '知识图谱' },
   },
   // 兜底：任何未匹配路径回首页
   {

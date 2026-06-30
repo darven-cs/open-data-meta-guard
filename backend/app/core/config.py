@@ -2,7 +2,7 @@
 集中读 .env 配置（pydantic-settings v2）。
 
 v2.0 调整：
-  - 删除 neo4j_uri / neo4j_user / neo4j_password / neo4j_database 配置项
+  - Phase 5 新增 NEO4J_* 配置项
   - 端口默认值改 10020（v2.0 独立占用，避免与 v1.0 的 10010 冲突）
 """
 from functools import lru_cache
@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     download_dir: str = Field(default="./data")
     download_timeout: int = Field(default=60)
     download_max_file_size_mb: int = Field(default=500)
+
+    # ---------- Neo4j（Phase 5 知识图谱） ----------
+    neo4j_uri: str = Field(default="bolt://localhost:10012")
+    neo4j_user: str = Field(default="neo4j")
+    neo4j_password: str = Field(default="change_me")
+    neo4j_database: str = Field(default="neo4j")
 
     # ---------- 质量评估 ----------
     quality_sample_size: int = Field(default=100_000)

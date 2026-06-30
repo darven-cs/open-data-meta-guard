@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────
-# v2.0 中间件：仅 PostgreSQL（v1.0 的 Neo4j 已彻底移除）
+# v2.0 中间件：PostgreSQL + Neo4j（Phase 5 知识图谱）
 # ─────────────────────────────────────────────────────────────────────
 # 启动命令：
 #   docker compose up -d              # 起服务
@@ -11,9 +11,12 @@
 #
 # 端口规划（v2.0 单独占用一组，避免与 v1.0 冲突）：
 #   10020 → PostgreSQL (容器内 5432)
+#   10011 → Neo4j Browser (容器内 7474)
+#   10012 → Neo4j Bolt (容器内 7687)
 #
 # 凭据：
 #   PG: postgres / change_me  库: open_data_meta_guard
+#   Neo4j: neo4j / change_me
 #
 # 应用侧 .env 对应配置（请同步到 .env）：
 #   POSTGRES_HOST=localhost
@@ -21,6 +24,9 @@
 #   POSTGRES_DB=open_data_meta_guard
 #   POSTGRES_USER=postgres
 #   POSTGRES_PASSWORD=change_me
+#   NEO4J_URI=bolt://localhost:10012
+#   NEO4J_USER=neo4j
+#   NEO4J_PASSWORD=change_me
 
 services:
   # ───────── PostgreSQL 16 ─────────
@@ -48,12 +54,36 @@ services:
     networks:
       - odmg-v2-net
 
+  # ───────── Neo4j 5 Community ─────────
+  # Phase 5 知识图谱存储
+  neo4j:
+    image: neo4j:5-community
+    container_name: odmg-v2-neo4j
+    restart: unless-stopped
+    ports:
+      - "10011:7474"   # Browser HTTP
+      - "10012:7687"   # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/change_me
+    volumes:
+      - neo4j_v2_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p change_me 'RETURN 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - odmg-v2-net
+
 # ─────────────────────────────────────────────────────────────────────
 # 命名卷：docker compose down 不会删除，要彻底清空用 `docker compose down -v`
 # ─────────────────────────────────────────────────────────────────────
 volumes:
   postgres_v2_data:
     name: odmg_v2_postgres_data
+  neo4j_v2_data:
+    name: odmg_v2_neo4j_data
 
 networks:
   odmg-v2-net:

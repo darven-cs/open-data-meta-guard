@@ -140,7 +140,7 @@ const collectGroup = FEATURES.filter((f) =>
   ['meta-collect', 'data-collect'].includes(f.id),
 )
 const evaluateGroup = FEATURES.filter((f) =>
-  ['meta-evaluate', 'data-quality'].includes(f.id),
+  ['meta-evaluate', 'data-quality', 'kg'].includes(f.id),
 )
 const chatFeature = FEATURES.find((f) => f.id === 'chat')!
 

@@ -24,6 +24,7 @@ from app.api.routes import meta_collect  # Phase 1
 from app.api.routes import meta_evaluate  # Phase 2
 from app.api.routes import data_collect  # Phase 3
 from app.api.routes import data_quality  # Phase 4
+from app.api.routes import kg_graph  # Phase 5
 
 
 def create_app():
@@ -51,4 +52,6 @@ def create_app():
     app.include_router(data_collect.router)
     # Phase 4: data_quality
     app.include_router(data_quality.router)
+    # Phase 5: knowledge graph
+    app.include_router(kg_graph.router)
     return app

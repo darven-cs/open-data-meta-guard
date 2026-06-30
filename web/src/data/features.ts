@@ -68,6 +68,17 @@ export const FEATURES: Feature[] = [
     ready: false,  // Phase 4 点亮
   },
   {
+    id: 'kg',
+    title: '知识图谱',
+    subtitle: 'Knowledge Graph',
+    description:
+      '从元数据中自动抽取实体和关系，构建知识图谱进行可视化探索与分析。',
+    // 网状图，表「知识图谱」
+    iconPath:
+      'M12 2l3 7h7l-5 5 2 7-7-4-7 4 2-7-5-5h7zM12 6v12M6 12h12',
+    ready: false,  // Phase 5 构建中
+  },
+  {
     id: 'chat',
     title: '数据小D',
     subtitle: 'Data Agent',

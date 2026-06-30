@@ -1,5 +1,5 @@
 """
-SQLAlchemy 2.x async 数据库层。
+SQLAlchemy 2.x async 数据库层 + Neo4j 异步驱动管理。
 
 公开接口
 --------
@@ -8,11 +8,15 @@ SQLAlchemy 2.x async 数据库层。
 - `Base`              : DeclarativeBase，所有 ORM 模型继承
 - `get_db()`          : FastAPI dependency
 - `ping()`            : 探活，lifespan / /health 用
+- `get_neo4j_driver()`: Neo4j AsyncDriver 单例
+- `init_neo4j_driver()`: 初始化 Neo4j 驱动（lifespan 启动时调）
+- `close_neo4j_driver()`: 关闭 Neo4j 驱动（lifespan 关闭时调）
 
-v2.0 调整：原样搬自 v1.0（v1.0 没有 neo4j 相关代码，纯 PG 层）。
+v2.0 调整：Phase 5 新增 Neo4j 异步驱动管理。
 """
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
+from neo4j import AsyncDriver, AsyncGraphDatabase
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -98,6 +102,68 @@ async def dispose() -> None:
         logger.warning("[db] dispose error: {}", e)
 
 
+# ═══════════════════════════════════════════════════════════════════
+# Neo4j 异步驱动（Phase 5 知识图谱）
+# ═══════════════════════════════════════════════════════════════════
+
+_neo4j_driver: Optional[AsyncDriver] = None
+
+
+def get_neo4j_driver() -> AsyncDriver:
+    """获取 Neo4j AsyncDriver 单例。
+
+    Raises:
+        RuntimeError: 驱动未初始化（lifespan 启动前或关闭后调用）
+    """
+    if _neo4j_driver is None:
+        raise RuntimeError("Neo4j driver not initialized. Call init_neo4j_driver() first.")
+    return _neo4j_driver
+
+
+async def init_neo4j_driver() -> None:
+    """初始化 Neo4j 异步驱动（lifespan 启动阶段调用）。"""
+    global _neo4j_driver
+    try:
+        driver = AsyncGraphDatabase.driver(
+            settings.neo4j_uri,
+            auth=(settings.neo4j_user, settings.neo4j_password),
+        )
+        # 验证连接
+        async with driver.session(database=settings.neo4j_database) as session:
+            await session.run("RETURN 1")
+        _neo4j_driver = driver
+        logger.info("[neo4j] driver initialized: uri={}", settings.neo4j_uri)
+    except Exception as e:
+        logger.error("[neo4j] driver init failed: {}", e)
+        raise
+
+
+async def close_neo4j_driver() -> None:
+    """优雅关闭 Neo4j 驱动（lifespan 关闭阶段调用）。"""
+    global _neo4j_driver
+    if _neo4j_driver is None:
+        return
+    try:
+        await _neo4j_driver.close()
+        logger.info("[neo4j] driver closed")
+    except Exception as e:
+        logger.warning("[neo4j] driver close error: {}", e)
+    finally:
+        _neo4j_driver = None
+
+
+async def ping_neo4j() -> tuple[bool, str | None]:
+    """Neo4j 探活。"""
+    try:
+        driver = get_neo4j_driver()
+        async with driver.session(database=settings.neo4j_database) as session:
+            await session.run("RETURN 1")
+        return True, None
+    except Exception as e:
+        logger.error("[neo4j] ping failed: {}", e)
+        return False, str(e)
+
+
 __all__ = [
     "engine",
     "AsyncSessionLocal",
@@ -105,4 +171,8 @@ __all__ = [
     "get_db",
     "ping",
     "dispose",
+    "get_neo4j_driver",
+    "init_neo4j_driver",
+    "close_neo4j_driver",
+    "ping_neo4j",
 ]
