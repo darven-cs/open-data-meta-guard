@@ -53,6 +53,9 @@ def _sse_done() -> str:
 
 _TOOL_NAME_MAP = {
     "kg_query": "kg_query",
+    "dataset_meta_query": "dataset_meta_query",
+    "data_cluster_analysis": "data_cluster_analysis",
+    "data_exception_mining": "data_exception_mining",
     "analyze_and_chart": "analyze_and_chart",
 }
 
@@ -202,12 +205,22 @@ async def stream(request: Request):
                             collected_kg_context = json.loads(result)
                         except (json.JSONDecodeError, TypeError):
                             pass
-                    elif name == "analyze_and_chart":
+                    elif name in (
+                        "analyze_and_chart",
+                        "data_cluster_analysis",
+                        "data_exception_mining",
+                    ):
                         try:
                             ar = json.loads(result)
                             if ar.get("chart_path"):
                                 collected_charts.append({
-                                    "chart_type": tc.get("args", {}).get("analysis_type", "unknown"),
+                                    "chart_type": tc.get("args", {}).get(
+                                        "analysis_type",
+                                        tc.get("args", {}).get(
+                                            "method",
+                                            name.replace("data_", "").replace("_analysis", "").replace("_mining", ""),
+                                        ),
+                                    ),
                                     "file_path": ar["chart_path"],
                                     "title": tc.get("args", {}).get("chart_title", ""),
                                 })
@@ -343,7 +356,8 @@ async def _auto_generate_title(
             return
 
         prompt = (
-            "用不超过12个字总结以下对话的主题，只输出标题：\n"
+            "用不超过12个字总结以下对话的主题，只输出标题。"
+            "风格：客观中立、事实先行，不含主观评价。\n"
             f"{user_msg[:200]}"
         )
         resp = await llm.ainvoke([HumanMessage(content=prompt)])
