@@ -4,72 +4,28 @@
 - **不用 exec()，用参数化分析函数**：LLM 选分析类型 + 传参数，
   工具内部调用对应 pandas/matplotlib 方法，安全可控。
 - **matplotlib Agg backend + asyncio.to_thread()**：无显示器 + 不阻塞事件循环。
-- **中文支持**：自动尝试多个中文字体。
+- **中文支持**：自动尝试多个中文字体（由 _charting_common 在 import 时设置）。
 
 支持的分析类型：
 - describe / value_counts / groupby / corr_matrix / null_analysis
 - histogram / bar_chart / line_chart / scatter / pie_chart
 """
 import asyncio
-import io
 import json
-import os
-import time
 from pathlib import Path
-
-import matplotlib
-matplotlib.use("Agg")  # 必须在 import pyplot 之前设置
 
 import matplotlib.pyplot as plt
 import pandas as pd
 from langchain.tools import tool
 
-from app.core.config import settings
+from app.agents.tools._charting_common import (
+    _CHARTS_DIR,
+    _safe_read_df,
+    save_fig_as_png,
+)
 from app.core.db import AsyncSessionLocal
 from app.core.log import logger
 from app.dao import data_download as download_dao
-from app.model.data_download import DataDownload
-
-
-# ───────── 中文支持 ─────────
-
-# 按优先级尝试中文字体
-_CN_FONT_CANDIDATES = [
-    "Noto Sans CJK SC",
-    "SimHei",
-    "WenQuanYi Micro Hei",
-    "WenQuanYi Zen Hei",
-    "Noto Sans SC",
-    "AR PL UMing CN",
-    "DejaVu Sans",
-]
-_CN_FONT = None
-
-for _f in _CN_FONT_CANDIDATES:
-    try:
-        from matplotlib.font_manager import FontProperties
-        FontProperties(family=_f)
-        _CN_FONT = _f
-        break
-    except Exception:
-        continue
-
-if _CN_FONT:
-    plt.rcParams["font.sans-serif"] = [_CN_FONT, "DejaVu Sans"]
-    plt.rcParams["axes.unicode_minus"] = False
-    logger.info("[data_analysis_tool] using font: {}", _CN_FONT)
-else:
-    logger.warning("[data_analysis_tool] no CJK font found, chart labels may render as tofu")
-
-
-# ───────── 图表目录 ─────────
-
-def _charts_dir() -> Path:
-    base = Path(settings.download_dir).resolve()
-    return base / "charts"
-
-
-_CHARTS_DIR = _charts_dir()
 
 
 # ───────── 分析类型常量 ─────────
@@ -86,33 +42,6 @@ ANALYSIS_TYPES = [
     "scatter",
     "pie_chart",
 ]
-
-
-# ───────── 守护函数 ─────────
-
-# 中国政务数据文件常见编码（UTF-8 → GBK → GB18030 → latin-1 回退）
-_CSV_ENCODINGS = ["utf-8", "gbk", "gb2312", "gb18030", "latin-1"]
-
-
-def _safe_read_df(file_path: str, file_format: str) -> pd.DataFrame:
-    """安全读取 CSV/XLSX，自动探测编码（中文政务数据常用 GBK）。"""
-    fmt = file_format.lower()
-    if fmt == "csv":
-        last_err = None
-        for enc in _CSV_ENCODINGS:
-            try:
-                return pd.read_csv(file_path, encoding=enc, nrows=settings.quality_sample_size)
-            except (UnicodeDecodeError, UnicodeError) as e:
-                last_err = e
-                continue
-        # 所有编码都失败，抛最后一种编码的错误
-        raise ValueError(f"无法读取 CSV（已尝试编码 {_CSV_ENCODINGS}）: {last_err}")
-    elif fmt in ("xls", "xlsx"):
-        return pd.read_excel(file_path, nrows=settings.quality_sample_size)
-    elif fmt == "json":
-        return pd.read_json(file_path)
-    else:
-        raise ValueError(f"unsupported file format: {fmt}")
 
 
 # ───────── 分析函数 ─────────
@@ -192,7 +121,7 @@ def _render_chart(
     agg_func: str = "mean",
     bins: int = 10,
     chart_title: str = "",
-    output_dir: str = "",
+    output_dir: str = "",  # noqa: ARG001 — 保留兼容签名
 ) -> str | None:
     """在后台线程中渲染 matplotlib 图表并保存为 PNG。
 
@@ -201,6 +130,7 @@ def _render_chart(
     """
     cols = columns or []
     fig = None
+    dataset_id = Path(output_dir).name if output_dir else "unknown"
 
     try:
         if analysis_type == "histogram":
@@ -252,18 +182,8 @@ def _render_chart(
         else:
             return None  # describe/value_counts/groupby/corr/null_analysis 不生成图表
 
-        # 保存 PNG
-        dataset_dir = Path(output_dir)
-        dataset_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = int(time.time() * 1000)
-        filename = f"{analysis_type}_{timestamp}.png"
-        filepath = dataset_dir / filename
-        fig.savefig(filepath, dpi=150, bbox_inches="tight", facecolor="white")
-        plt.close(fig)
-
-        # 返回相对路径
-        rel_path = filepath.relative_to(_CHARTS_DIR.parent)
-        return str(rel_path)
+        # 保存 PNG(经共享 save_fig_as_png)
+        return save_fig_as_png(fig, dataset_id, analysis_type)
 
     except Exception as e:
         logger.warning("[data_analysis_tool] chart render failed for {}: {}", analysis_type, e)
