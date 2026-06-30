@@ -1,16 +1,17 @@
 <!--
-  UploadDrawer: 数据采集上传 Drawer（dataset 锁定模式）
+  UploadDrawer: 数据采集上传 Drawer（dataset 锁定模式，支持多文件）
 
   Props:
-    open      : boolean
-    dataset   : DatasetSelectItem | null  — 锁定的 dataset
-    uploading : boolean
-    progress  : number — 0..100
-    errorMsg  : string
+    open        : boolean
+    dataset     : DatasetSelectItem | null  — 锁定的 dataset
+    uploading   : boolean
+    progress    : number — 0..100
+    errorMsg    : string
+    uploadLabel?: string — 自定义上传中文案（默认「上传中…」）
 
   Emits:
     close  : ()
-    submit : ({ dataset_id, file })
+    submit : ({ dataset_id, files: File[] })
 -->
 <template>
   <Teleport to="body">
@@ -47,13 +48,13 @@
           <FileUploadInput
             :accept="'.csv,.xlsx,.json'"
             hint="拖拽文件到此处，或点击选择"
-            @file-selected="onFileSelected"
+            @files-selected="onFilesSelected"
           />
 
           <UploadProgress
             v-if="uploading || progress > 0"
             :progress="progress"
-            :label="uploading ? '上传中…' : '完成'"
+            :label="uploading ? (uploadLabel || '上传中…') : '完成'"
           />
 
           <p v-if="errorMsg" class="upload-drawer__error">
@@ -76,7 +77,7 @@
             :disabled="!canSubmit || uploading"
             @click="onSubmit"
           >
-            {{ uploading ? '上传中…' : '上传' }}
+            {{ uploading ? (uploadLabel || '上传中…') : '上传 (' + files.length + ')' }}
           </button>
         </footer>
       </aside>
@@ -96,35 +97,36 @@ const props = defineProps<{
   uploading: boolean
   progress: number
   errorMsg?: string
+  uploadLabel?: string
 }>()
 
 const emit = defineEmits<{
   close: []
-  submit: [payload: { dataset_id: string; file: File }]
+  submit: [payload: { dataset_id: string; files: File[] }]
 }>()
 
-const file = ref<File | null>(null)
+const files = ref<File[]>([])
 
 watch(
   () => props.open,
   (v) => {
     if (v) {
-      file.value = null
+      files.value = []
     }
   },
 )
 
 const canSubmit = computed(
-  () => props.dataset !== null && file.value !== null,
+  () => props.dataset !== null && files.value.length > 0,
 )
 
-function onFileSelected(f: File | null) {
-  file.value = f
+function onFilesSelected(list: File[]) {
+  files.value = list
 }
 
 function onSubmit() {
-  if (!canSubmit.value || !file.value || !props.dataset) return
-  emit('submit', { dataset_id: props.dataset.id, file: file.value })
+  if (!canSubmit.value || !props.dataset) return
+  emit('submit', { dataset_id: props.dataset.id, files: [...files.value] })
 }
 
 function truncate(s: string, max: number): string {

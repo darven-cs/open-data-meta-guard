@@ -60,6 +60,7 @@
       :uploading="uploading"
       :progress="uploadProgress"
       :error-msg="uploadError"
+      :upload-label="uploadLabel"
       @close="closeUploadDrawer"
       @submit="submitUpload"
     />
@@ -79,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   buildDownloadUrl,
   deleteDownload as apiDeleteDownload,
@@ -158,25 +159,52 @@ function closeUploadDrawer() {
   void refresh()
 }
 
-async function submitUpload(payload: { dataset_id: string; file: File }) {
+const uploadLabel = computed(() => {
+  if (!uploading.value) return ''
+  if (!uploadDrawerDataset.value) return '上传中…'
+  return `正在上传 ${currentFileIndex.value + 1}/${currentFileTotal.value} …`
+})
+
+const currentFileIndex = ref(0)
+const currentFileTotal = ref(0)
+
+async function submitUpload(payload: { dataset_id: string; files: File[] }) {
   uploadingIds.add(payload.dataset_id)
   uploading.value = true
   uploadError.value = ''
   uploadProgress.value = 0
+
+  const { dataset_id, files } = payload
+  const total = files.length
+  currentFileTotal.value = total
+
   try {
-    await apiUpload(payload.dataset_id, payload.file, (p) => {
-      uploadProgress.value = p
-    })
+    for (let i = 0; i < total; i++) {
+      currentFileIndex.value = i
+      const file = files[i]
+
+      try {
+        await apiUpload(dataset_id, file, (filePct) => {
+          // 整体进度 = 已完成文件的基础进度 + 当前文件加权进度
+          const pct = Math.round(((i + filePct / 100) / total) * 100)
+          uploadProgress.value = pct
+        })
+        // 每个文件完成后更新基础进度
+        uploadProgress.value = Math.round(((i + 1) / total) * 100)
+      } catch (e) {
+        uploadError.value = `'${file.name}' 上传失败: ${(e as Error).message}`
+        return // 停止后续上传
+      }
+    }
+
+    // 全部完成
     uploadProgress.value = 100
     await refresh()
     // 如果 modal 开着且是同一个 dataset，刷新 modal 列表
-    if (modalOpen.value && modalDataset.value?.id === payload.dataset_id) {
-      const res = await apiListDownloads(payload.dataset_id, 1, 100)
+    if (modalOpen.value && modalDataset.value?.id === dataset_id) {
+      const res = await apiListDownloads(dataset_id, 1, 100)
       modalItems.value = res.items
     }
-    // 上传成功后不自动关闭 Drawer，允许继续上传
-  } catch (e) {
-    uploadError.value = (e as Error).message
   } finally {
     uploading.value = false
     uploadingIds.delete(payload.dataset_id)
