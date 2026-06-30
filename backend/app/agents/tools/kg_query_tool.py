@@ -1,14 +1,18 @@
 """知识图谱查询工具 — 数据故事 chatbot 用。
 
 供 LLM 通过 @tool 调用，在 Neo4j 知识图谱中搜索实体和数据集。
+返回结果会标注哪些数据集已有数据文件（可直接分析），
+避免 LLM 在无数据文件的数据集上浪费分析轮次。
 """
 import json
 
 from langchain.tools import tool
+from sqlalchemy import select, func
 
-from app.core.db import get_neo4j_driver
-from app.dao import kg as kg_dao
+from app.core.db import AsyncSessionLocal, get_neo4j_driver
 from app.core.log import logger
+from app.dao import kg as kg_dao
+from app.model.data_download import DataDownload
 
 
 @tool
@@ -72,11 +76,33 @@ async def kg_query(keywords: str) -> str:
                 for ds in ds_result["datasets"]:
                     all_dataset_ids.add(ds["dataset_id"])
 
-    # 3. 返回聚合结果
+    # 3. 交叉查 PG：标记哪些数据集已有数据文件（可直接分析）
+    datasets_with_files: set[str] = set()
+    if all_dataset_ids:
+        try:
+            async with AsyncSessionLocal() as session:
+                stmt = (
+                    select(DataDownload.dataset_id)
+                    .where(DataDownload.dataset_id.in_(list(all_dataset_ids)))
+                    .distinct()
+                )
+                result = await session.execute(stmt)
+                datasets_with_files = {row[0] for row in result.fetchall()}
+        except Exception as e:
+            logger.warning("[kg_query] failed to check data_downloads: {}", e)
+
+    # 标记 entities 中哪些有数据文件
+    for ent in entities_with_datasets:
+        ent["has_data_files"] = any(
+            d["dataset_id"] in datasets_with_files for d in ent.get("datasets", [])
+        )
+
+    # 4. 返回聚合结果
     return json.dumps({
         "entities": entities_with_datasets,
         "datasets": sorted(list(all_dataset_ids)),
-        "similar_groups": [],  # 预留：可扩展为 SIMILAR_TO 相似分组
+        "datasets_with_files": sorted(list(datasets_with_files)),
+        "similar_groups": [],  # 预留
     }, ensure_ascii=False)
 
 

@@ -90,11 +90,23 @@ ANALYSIS_TYPES = [
 
 # ───────── 守护函数 ─────────
 
+# 中国政务数据文件常见编码（UTF-8 → GBK → GB18030 → latin-1 回退）
+_CSV_ENCODINGS = ["utf-8", "gbk", "gb2312", "gb18030", "latin-1"]
+
+
 def _safe_read_df(file_path: str, file_format: str) -> pd.DataFrame:
-    """安全读取 CSV/XLSX，返回 DataFrame。"""
+    """安全读取 CSV/XLSX，自动探测编码（中文政务数据常用 GBK）。"""
     fmt = file_format.lower()
     if fmt == "csv":
-        return pd.read_csv(file_path, nrows=settings.quality_sample_size)
+        last_err = None
+        for enc in _CSV_ENCODINGS:
+            try:
+                return pd.read_csv(file_path, encoding=enc, nrows=settings.quality_sample_size)
+            except (UnicodeDecodeError, UnicodeError) as e:
+                last_err = e
+                continue
+        # 所有编码都失败，抛最后一种编码的错误
+        raise ValueError(f"无法读取 CSV（已尝试编码 {_CSV_ENCODINGS}）: {last_err}")
     elif fmt in ("xls", "xlsx"):
         return pd.read_excel(file_path, nrows=settings.quality_sample_size)
     elif fmt == "json":
