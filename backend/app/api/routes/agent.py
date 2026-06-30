@@ -21,8 +21,10 @@ from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, Sys
 from app.agents.data_story.builder import build
 from app.agents.data_story.prompt import DATA_STORY_PROMPT
 from app.core.db import AsyncSessionLocal
+from app.core.llm import _build_llm, _build_llm_unthinking
 from app.core.log import logger
 from app.dao import chat as chat_dao
+from app.schemas.chat import ConversationCreate
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -102,6 +104,10 @@ async def stream(request: Request):
         collected_kg_context: dict = {}
         collected_tool_steps: list[dict] = []
 
+        # 客户端连接状态 + 文本内容累加器
+        assistant_content_parts: list[str] = []
+        _client_connected = True
+
         try:
             # 构建初始消息
             messages = [
@@ -112,16 +118,18 @@ async def stream(request: Request):
             # ── 手动 tool-calling 循环 ──
             for round_num in range(1, MAX_TOOL_ROUNDS + 1):
                 if await request.is_disconnected():
-                    logger.info("[agent] client disconnected during loop round {}", round_num)
-                    return
+                    if _client_connected:
+                        logger.info("[agent] client disconnected during loop round {}", round_num)
+                        _client_connected = False
 
                 # ── astream → yield token/reasoning events ──
                 full_chunks: list[AIMessageChunk] = []
 
                 async for chunk in llm_with_tools.astream(messages):
                     if await request.is_disconnected():
-                        logger.info("[agent] client disconnected during streaming")
-                        return
+                        if _client_connected:
+                            logger.info("[agent] client disconnected during streaming")
+                            _client_connected = False
 
                     full_chunks.append(chunk)
 
@@ -132,7 +140,8 @@ async def stream(request: Request):
                         else ""
                     )
                     if reasoning and isinstance(reasoning, str):
-                        yield _sse("reasoning", {"content": reasoning})
+                        if _client_connected:
+                            yield _sse("reasoning", {"content": reasoning})
                         continue
 
                     # 如果有 tool_call_chunks → 跳过 content（content 可能是工具参数的 JSON 片段）
@@ -144,7 +153,9 @@ async def stream(request: Request):
                     # 输出文本 token
                     content = chunk.content
                     if content and isinstance(content, str) and not has_tool_chunks:
-                        yield _sse("token", {"content": content})
+                        if _client_connected:
+                            yield _sse("token", {"content": content})
+                        assistant_content_parts.append(content)
 
                 # ── 合并所有 chunks 为一条完整消息 ──
                 if not full_chunks:
@@ -166,7 +177,8 @@ async def stream(request: Request):
                 # 发送 tool_start 事件
                 for tc in tool_calls:
                     name = _get_tool_name(tc)
-                    yield _sse("tool_start", {"tool": name})
+                    if _client_connected:
+                        yield _sse("tool_start", {"tool": name})
                     collected_tool_steps.append({"tool": name, "status": "running"})
 
                 tool_results = await _execute_tools_concurrent(tools, tool_calls)
@@ -174,7 +186,8 @@ async def stream(request: Request):
                 # 发送 tool_end 事件
                 for tc in tool_calls:
                     name = _get_tool_name(tc)
-                    yield _sse("tool_end", {"tool": name})
+                    if _client_connected:
+                        yield _sse("tool_end", {"tool": name})
                     # 更新 tool_steps
                     for s in collected_tool_steps:
                         if s["tool"] == name and s["status"] == "running":
@@ -213,13 +226,15 @@ async def stream(request: Request):
                 )
 
             # ── 流结束 ──
-            yield _sse_done()
+            assistant_content = "".join(assistant_content_parts)
+            if _client_connected:
+                yield _sse_done()
 
-            # ── 持久化到 DB（可选） ──
+            # ── 持久化到 DB ──
             await _persist_conversation(
                 conv_id=conv_id,
                 user_msg=user_msg,
-                assistant_content="",  # 前端已有完整内容，后端不重复存
+                assistant_content=assistant_content,
                 chart_paths=collected_charts,
                 kg_context=collected_kg_context,
                 tool_steps=collected_tool_steps,
@@ -227,7 +242,8 @@ async def stream(request: Request):
 
         except Exception as e:
             logger.error("[agent] stream error: {}\n{}", e, traceback.format_exc())
-            yield _sse_error(str(e))
+            if _client_connected:
+                yield _sse_error(str(e))
 
     return StreamingResponse(
         event_stream(),
@@ -279,11 +295,13 @@ async def _persist_conversation(
     """持久化对话到 PG（可选，失败不阻塞）。"""
     try:
         async with AsyncSessionLocal() as session:
+            is_new = False
             # 创建或复用会话
             if not conv_id:
                 conv_res = await chat_dao.create_conversation(session, title="新会话")
                 if conv_res.get("ok"):
                     conv_id = conv_res["conversation"]["id"]
+                    is_new = True
                 else:
                     logger.warning("[agent] failed to create conversation")
                     return
@@ -303,9 +321,40 @@ async def _persist_conversation(
                 kg_context=kg_context,
                 tool_steps=tool_steps,
             )
+
+            # 新会话首次对话结束后，用 LLM 生成标题
+            if is_new:
+                await _auto_generate_title(session, conv_id, user_msg)
         logger.info("[agent] persisted conversation {} to DB", conv_id)
     except Exception as e:
         logger.warning("[agent] persist failed (non-blocking): {}", e)
+
+
+async def _auto_generate_title(
+    session, conv_id: str, user_msg: str
+) -> None:
+    """用 LLM 根据第一条用户消息生成 ≤12 字标题（失败不阻塞）。"""
+    try:
+        llm = _build_llm_unthinking()
+        if llm is None:
+            llm = _build_llm()
+        if llm is None:
+            logger.warning("[agent] no LLM available for title generation")
+            return
+
+        prompt = (
+            "用不超过12个字总结以下对话的主题，只输出标题：\n"
+            f"{user_msg[:200]}"
+        )
+        resp = await llm.ainvoke([HumanMessage(content=prompt)])
+        title = resp.content.strip()[:12] if resp.content else "新会话"
+        if not title:
+            title = "新会话"
+
+        await chat_dao.update_conversation_title(session, conv_id, title)
+        logger.info("[agent] auto-generated title '{}' for conv {}", title, conv_id)
+    except Exception as e:
+        logger.warning("[agent] title generation failed (non-blocking): {}", e)
 
 
 # ───────── 会话管理端点（可选，后续迭代）─────────
@@ -340,6 +389,63 @@ async def delete_conversation(conv_id: str):
             return {"code": 200, "data": None, "msg": "success"}
     except Exception as e:
         logger.error("[agent] delete_conversation failed: {}", e)
+        return {"code": 500, "data": None, "msg": str(e)}
+
+
+@router.post("/conversations")
+async def create_conversation(body: ConversationCreate):
+    """显式创建会话，返回服务端 UUID。"""
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await chat_dao.create_conversation(session, title=body.title)
+            if not result.get("ok"):
+                return {"code": 500, "data": None, "msg": result.get("error", "")}
+            return {
+                "code": 200,
+                "data": result["conversation"],
+                "msg": "success",
+            }
+    except Exception as e:
+        logger.error("[agent] create_conversation failed: {}", e)
+        return {"code": 500, "data": None, "msg": str(e)}
+
+
+@router.get("/conversations/{conv_id}/messages")
+async def get_messages(conv_id: str):
+    """获取会话历史消息。"""
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await chat_dao.get_messages(session, conv_id)
+            if not result.get("ok"):
+                return {"code": 404, "data": None, "msg": result.get("error", "")}
+            return {
+                "code": 200,
+                "data": result["messages"],
+                "msg": "success",
+            }
+    except Exception as e:
+        logger.error("[agent] get_messages failed: {}", e)
+        return {"code": 500, "data": None, "msg": str(e)}
+
+
+@router.patch("/conversations/{conv_id}/title")
+async def update_title(conv_id: str, body: dict):
+    """更新会话标题。"""
+    title = body.get("title", "").strip()
+    if not title:
+        return {"code": 400, "data": None, "msg": "title is required"}
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await chat_dao.update_conversation_title(session, conv_id, title)
+            if not result.get("ok"):
+                return {"code": 404, "data": None, "msg": result.get("error", "")}
+            return {
+                "code": 200,
+                "data": result["conversation"],
+                "msg": "success",
+            }
+    except Exception as e:
+        logger.error("[agent] update_title failed: {}", e)
         return {"code": 500, "data": None, "msg": str(e)}
 
 
