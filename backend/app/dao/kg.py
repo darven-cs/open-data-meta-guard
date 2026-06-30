@@ -438,6 +438,114 @@ async def get_dataset_relations(
 # ───────── Jaccard 相似度 ─────────
 
 
+# ───────── 关键词搜索（Phase 6 数据故事 chatbot）─────────
+
+
+async def search_entities_by_keyword(
+    driver: AsyncDriver,
+    keyword: str,
+    entity_types: list[str] | None = None,
+    limit: int = 10,
+) -> dict:
+    """关键词搜索实体（模糊匹配实体名）。
+
+    Args:
+        keyword: 搜索关键词
+        entity_types: None 或空列表表示全部类型；否则只匹配指定类型
+        limit: 最大返回条数
+
+    Returns:
+        {"ok": True, "entities": [...]} / {"ok": False, "error": "..."}
+    """
+    if not keyword or not keyword.strip():
+        return {"ok": True, "entities": []}
+
+    labels = (
+        [t.capitalize() for t in entity_types]
+        if entity_types
+        else ["Publisher", "Theme", "Keyword", "Format"]
+    )
+
+    all_entities: list[dict] = []
+    seen: set[str] = set()
+
+    async with driver.session(database=settings.neo4j_database) as session:
+        for label in labels:
+            cypher = f"""
+            MATCH (e:{label})
+            WHERE e.name CONTAINS $keyword
+            OPTIONAL MATCH (d:Dataset)-[:{_rel_for_label(label)}]->(e)
+            OPTIONAL MATCH (e)-[r]-(d2:Dataset)
+            RETURN e.name AS name, '{label}' AS type, count(DISTINCT d2) AS dataset_count
+            ORDER BY dataset_count DESC
+            LIMIT $limit
+            """
+            try:
+                result = await session.run(
+                    cypher, {"keyword": keyword.strip(), "limit": limit}
+                )
+                async for record in result:
+                    key = f"{record['type']}:{record['name']}"
+                    if key not in seen:
+                        seen.add(key)
+                        all_entities.append({
+                            "id": key,
+                            "type": record["type"],
+                            "name": record["name"],
+                            "dataset_count": record["dataset_count"],
+                        })
+            except Exception as e:
+                logger.warning(
+                    "[kg-dao] search_entities_by_keyword failed for {}: {}", label, e
+                )
+
+    # 按关联数据集数量降序, 截断 limit
+    all_entities.sort(key=lambda x: x["dataset_count"], reverse=True)
+    return {"ok": True, "entities": all_entities[:limit]}
+
+
+async def get_datasets_by_entity(
+    driver: AsyncDriver,
+    entity_name: str,
+    entity_type: str,
+) -> dict:
+    """获取关联到某实体的所有 dataset 信息。
+
+    Args:
+        entity_name: 实体名称
+        entity_type: 实体类型（如 Publisher / Theme / Keyword / Format）
+
+    Returns:
+        {"ok": True, "datasets": [...]} / {"ok": False, "error": "..."}
+    """
+    if not entity_name or not entity_type:
+        return {"ok": False, "error": "entity_name and entity_type are required"}
+
+    label = entity_type.capitalize()
+    rel = _rel_for_label(label)
+    cypher = f"""
+    MATCH (e:{label} {{name: $name}})<-[r]-(d:Dataset)
+    RETURN d.dataset_id AS dataset_id, type(r) AS rel_type, r.confidence AS confidence
+    ORDER BY r.confidence DESC
+    LIMIT 50
+    """
+
+    try:
+        async with driver.session(database=settings.neo4j_database) as session:
+            result = await session.run(cypher, {"name": entity_name})
+            datasets: list[dict] = []
+            async for record in result:
+                datasets.append({
+                    "dataset_id": record["dataset_id"],
+                    "rel_type": record["rel_type"],
+                    "confidence": record["confidence"] or 1.0,
+                })
+        return {"ok": True, "datasets": datasets}
+    except Exception as e:
+        logger.error("[kg-dao] get_datasets_by_entity failed: {}", e)
+        return {"ok": False, "error": str(e)}
+
+
 async def compute_similarity(driver: AsyncDriver) -> int:
     """计算 Dataset-Dataset Jaccard 相似度 → [:SIMILAR_TO] 边。
 

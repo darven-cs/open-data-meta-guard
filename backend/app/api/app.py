@@ -15,6 +15,7 @@ load_dotenv()
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.log import setup_logging, logger
 from app.core.lifespan import app_lifespan
@@ -25,6 +26,7 @@ from app.api.routes import meta_evaluate  # Phase 2
 from app.api.routes import data_collect  # Phase 3
 from app.api.routes import data_quality  # Phase 4
 from app.api.routes import kg_graph  # Phase 5
+from app.api.routes import agent  # Phase 6
 
 
 def create_app():
@@ -54,4 +56,8 @@ def create_app():
     app.include_router(data_quality.router)
     # Phase 5: knowledge graph
     app.include_router(kg_graph.router)
+    # Phase 6: data story chatbot agent
+    app.include_router(agent.router)
+    # 图表静态文件服务
+    app.mount("/api/charts", StaticFiles(directory="data/charts"), name="charts")
     return app

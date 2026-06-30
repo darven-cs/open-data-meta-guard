@@ -60,6 +60,7 @@ def ensure_data_dirs() -> None:
         base / "raw",
         base / "cleaned",
         base / "uploads",
+        base / "charts",
         base / "reports" / "meta_evaluate",
         base / "reports" / "quality",
     ]

@@ -25,6 +25,22 @@
                 </div>
             </div>
 
+            <!-- tool steps 进度条：只在 assistant 消息有 steps 时显示 -->
+            <div
+                v-if="message.role === 'assistant' && message.steps && message.steps.length > 0"
+                class="message-item__steps"
+            >
+                <div
+                    v-for="(step, idx) in message.steps"
+                    :key="idx"
+                    class="message-item__step"
+                    :class="`message-item__step--${step.status}`"
+                >
+                    <span class="message-item__step-dot"></span>
+                    <span class="message-item__step-name">{{ step.name }}</span>
+                </div>
+            </div>
+
             <!-- assistant：monogram + content 内层横向 row（避免被 reasoning 挤成竖条） -->
             <div v-if="message.role === 'assistant'" class="message-item__row">
                 <span class="message-item__role">A</span>
@@ -140,6 +156,65 @@ watch(
     color: var(--ink-sub);
     min-width: 0;
     box-sizing: border-box;
+}
+
+/* —— tool steps 进度条 —— */
+.message-item__steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-2);
+    margin-bottom: var(--sp-2);
+    padding: var(--sp-1) 0;
+    min-width: 0;
+}
+
+.message-item__step {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--ink-dim);
+    color: var(--ink-mute);
+}
+
+.message-item__step--running {
+    background: var(--accent);
+    color: var(--paper);
+}
+
+.message-item__step--done {
+    background: var(--ink-dim);
+    color: var(--ink-sub);
+}
+
+/* 小圆点 */
+.message-item__step-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+.message-item__step--running .message-item__step-dot {
+    opacity: 1;
+    animation: step-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes step-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.message-item__step-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
 }
 
 .message-item__reasoning-header {
