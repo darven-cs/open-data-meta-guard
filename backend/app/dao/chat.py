@@ -87,6 +87,32 @@ async def get_conversation(session: AsyncSession, conv_id: str) -> dict:
     return {"ok": True, "conversation": _conv_to_dict(row)}
 
 
+async def update_conversation_title(
+    session: AsyncSession, conv_id: str, title: str
+) -> dict:
+    """更新会话标题。
+
+    Returns:
+        {"ok": True, "conversation": {...}} / {"ok": False, "error": "..."}
+    """
+    if not conv_id:
+        return {"ok": False, "error": "conv_id is required"}
+    row = await session.get(Conversation, conv_id)
+    if row is None:
+        return {"ok": False, "error": f"conversation not found: {conv_id}"}
+    from datetime import datetime, timezone
+
+    row.title = title
+    row.updated_at = datetime.now(timezone.utc)
+    try:
+        await session.commit()
+        await session.refresh(row)
+    except IntegrityError as e:
+        await session.rollback()
+        return {"ok": False, "error": f"update_conversation_title integrity error: {e}"}
+    return {"ok": True, "conversation": _conv_to_dict(row)}
+
+
 async def delete_conversation(session: AsyncSession, conv_id: str) -> dict:
     """删除会话（级联删所有消息）。
 
@@ -182,6 +208,7 @@ __all__ = [
     "create_conversation",
     "list_conversations",
     "get_conversation",
+    "update_conversation_title",
     "delete_conversation",
     "add_message",
     "get_messages",

@@ -17,10 +17,8 @@ export function useChat() {
     // 防御：已有流在跑直接拒收（UI 已禁用按钮，但双保险）
     if (controller) return
 
-    // 1. 没会话先建（addMessage 依赖 currentConversation 非空，currentId=null 时 ?. 短路）
-    if (!store.currentId) {
-      store.createConversation()
-    }
+    // 1. 首次发消息才懒创建会话
+    await store.ensureActiveConversation()
 
     // 2. user 消息进 store
     store.sendUserMessage(text)
@@ -34,7 +32,7 @@ export function useChat() {
 
     try {
       // 5. 6 种 SSE 事件 → store action 一一映射
-      await streamChat(text, {
+      await streamChat(text, store.currentId, {
         onToken: (c) => store.appendContent(assistantId, c),
         onReasoning: (c) => store.appendReasoning(assistantId, c),
         onToolStart: (t) => store.addToolStep(assistantId, t),

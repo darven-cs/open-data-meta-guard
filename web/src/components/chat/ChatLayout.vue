@@ -33,11 +33,9 @@ function handleSend(text:string){
     send(text)
 }
 
-onMounted(() => {
-    // 进界面默认建一个空会话，用户直接能打字
-    if (!store.currentId) {
-      store.createConversation()
-    }
+onMounted(async () => {
+    // 仅加载历史会话列表，不建空会话——等用户发第一条消息时再懒创建
+    await store.loadConversationsFromServer()
   })
 
 

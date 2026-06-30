@@ -1,7 +1,7 @@
 <template>
     <div class="conversation-sidebar">
         <!-- 新建会话按钮 -->
-        <button class="conversation-sidebar__new" @click="createConversation">
+        <button class="conversation-sidebar__new" @click="handleNew">
             + 新建会话
         </button>
 
@@ -9,8 +9,15 @@
         <ul class="conversation-sidebar__list">
             <li v-for="conv in conversations" :key="conv.id" class="conversation-sidebar__item"
                 :class="{ 'conversation-sidebar__item--active': conv.id === currentId }"
-                @click="selectConversation(conv.id)">
-                {{ conv.title }}
+                @click="handleSwitch(conv.id)">
+                <span class="conversation-sidebar__title">{{ conv.title }}</span>
+                <button
+                    class="conversation-sidebar__delete"
+                    @click.stop="handleDelete(conv.id)"
+                    title="删除会话"
+                >
+                    &times;
+                </button>
             </li>
         </ul>
     </div>
@@ -22,7 +29,18 @@ import { useChatStore } from '@/stores/chat'
 import { storeToRefs } from 'pinia'
 const store = useChatStore()
 const { conversations, currentId } = storeToRefs(store)
-const { createConversation, selectConversation } = store
+
+async function handleNew() {
+    await store.createConversation()
+}
+
+async function handleSwitch(id: string) {
+    await store.switchConversation(id)
+}
+
+async function handleDelete(id: string) {
+    await store.deleteRemoteConversation(id)
+}
 </script>
 
 <style scoped>
@@ -64,14 +82,13 @@ const { createConversation, selectConversation } = store
 }
 
 .conversation-sidebar__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: var(--sp-2) var(--sp-3);
     border-left: 2px solid transparent;
     cursor: pointer;
     color: var(--ink-sub);
-    white-space: nowrap;
-    /* 单行省略三件套：标题长了显示 ... */
-    overflow: hidden;
-    text-overflow: ellipsis;
     transition: background 0.12s;
 }
 
@@ -85,5 +102,35 @@ const { createConversation, selectConversation } = store
     color: var(--ink);
     font-weight: 600;
     border-left-color: var(--accent);
+}
+
+.conversation-sidebar__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.conversation-sidebar__delete {
+    flex-shrink: 0;
+    margin-left: var(--sp-2);
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    color: var(--ink-sub);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+}
+
+.conversation-sidebar__item:hover .conversation-sidebar__delete {
+    opacity: 1;
+}
+
+.conversation-sidebar__delete:hover {
+    color: var(--accent);
 }
 </style>
