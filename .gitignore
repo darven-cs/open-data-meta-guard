@@ -85,3 +85,5 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/raw/*
 !data/raw/.gitkeep
+backend/data
+docs
